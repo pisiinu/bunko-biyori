@@ -263,16 +263,12 @@ function PageReader({ book, text, onClose, fontSize, setFontSize }) {
   });
 
   /*
-   * writing-mode: vertical-rl では：
-   *   - 要素の右端（x=totalWidth）が1ページ目（冒頭）、左端（x=0）が末尾
-   *   - translateX=0 のとき、コンテナは innerRef の左端（末尾）を表示してしまう
-   *   - 冒頭を表示するには innerRef を左にずらす（負のtx）必要がある
-   *
-   * tx = -(totalPages - 1 - page) * cw
-   *   page=0           → tx=-(totalPages-1)*cw → 右端（1ページ目）を表示 ✓
-   *   page=totalPages-1 → tx=0                 → 左端（最終ページ）を表示 ✓
+   * writing-mode: vertical-rl では右端が1ページ目（冒頭）
+   * tx = (totalPages - 1 - page) * cw
+   *   page=0           → tx=(totalPages-1)*cw → 右端（1ページ目）を表示 ✓
+   *   page=totalPages-1 → tx=0               → 左端（最終ページ）を表示 ✓
    */
-  const tx = -(totalPages - 1 - page) * cwRef.current;
+  const tx = (totalPages - 1 - page) * cwRef.current;
 
   const nextP = ()=>setPage(p=>Math.min(p+1,totalPages-1));
   const prevP = ()=>setPage(p=>Math.max(p-1,0));
@@ -286,8 +282,8 @@ function PageReader({ book, text, onClose, fontSize, setFontSize }) {
     const dx=e.changedTouches[0].clientX-touchStart.current.x;
     const dy=e.changedTouches[0].clientY-touchStart.current.y;
     if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)){
-      // 縦書き：左スワイプ=次ページ（左へ進む）、右スワイプ=前ページ
-      dx<0 ? nextP() : prevP();
+      // 縦書き：右スワイプ=次ページ（先へ進む）、左スワイプ=前ページ（戻る）
+      dx>0 ? nextP() : prevP();
     } else if(!didSwipe.current&&Math.abs(dx)<12&&Math.abs(dy)<12){
       setOverlay(v=>!v); setMiniSeek(false);
     }
