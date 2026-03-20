@@ -263,12 +263,15 @@ function PageReader({ book, text, onClose, fontSize, setFontSize }) {
   });
 
   /*
-   * writing-mode: vertical-rl では右端が1ページ目（冒頭）
-   * tx = (totalPages - 1 - page) * cw
-   *   page=0           → tx=(totalPages-1)*cw → 右端（1ページ目）を表示 ✓
-   *   page=totalPages-1 → tx=0               → 左端（最終ページ）を表示 ✓
+   * writing-mode: vertical-rl の要素は右端にアンカーされ左方向に伸びる
+   * tx=0 のとき右端（1ページ目=冒頭）が見える状態
+   * tx を増やすと要素が右へ動き、コンテナには左側（次ページ）が見える
+   *
+   * tx = page * cw
+   *   page=0           → tx=0               → 右端（1ページ目）を表示 ✓
+   *   page=totalPages-1 → tx=(totalPages-1)*cw → 左端（最終ページ）を表示 ✓
    */
-  const tx = (totalPages - 1 - page) * cwRef.current;
+  const tx = page * cwRef.current;
 
   const nextP = ()=>setPage(p=>Math.min(p+1,totalPages-1));
   const prevP = ()=>setPage(p=>Math.max(p-1,0));
