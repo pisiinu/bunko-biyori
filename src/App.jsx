@@ -325,12 +325,13 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   const touchStart   = useRef(null);
   const didSwipe     = useRef(false);
 
-  // フォントサイズ・テキスト変更時にページを再計算
+  // フォントサイズ・テキスト変更時にページを再計算（テキスト未取得時はスキップ）
   useEffect(()=>{
+    if(!text) return;
     const el = containerRef.current;
     const w  = el ? el.clientWidth  : window.innerWidth;
     const h  = el ? el.clientHeight : window.innerHeight;
-    const np = paginateText(text || "", w, h, fontSize);
+    const np = paginateText(text, w, h, fontSize);
     setPages(np);
     setPage(p => Math.min(p, Math.max(0, np.length - 1)));
   }, [text, fontSize]);
