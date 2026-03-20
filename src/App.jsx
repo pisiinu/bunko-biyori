@@ -320,6 +320,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   const [overlay,setOverlay]       = useState(false);
   const [miniSeek,setMiniSeek]     = useState(false);
   const [amazonModal,setAmazonModal] = useState(false);
+  const [copied,setCopied]         = useState(false);
 
   const [dragPageX,setDragPageX]       = useState(0);
   const [pageAnimating,setPageAnimating] = useState(false);
@@ -525,6 +526,10 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
               style={{background:"none",border:`1px solid #c0a880`,cursor:"pointer",padding:"5px 12px",
                 color:"#5a3a18",fontSize:11,letterSpacing:"0.08em",whiteSpace:"nowrap"}}>本を閉じる</button>
             <span style={{fontSize:13,fontWeight:700,color:"#1a0800",letterSpacing:"0.06em",flex:1}}>{book.title}</span>
+            <button onClick={async()=>{try{await navigator.clipboard.writeText(window.location.href);setCopied(true);setTimeout(()=>setCopied(false),2000);}catch{}}}
+              style={{background:"none",border:`1px solid #c0a880`,cursor:"pointer",padding:"5px 12px",
+                color:copied?"#5a9040":"#7a6040",fontSize:10,letterSpacing:"0.05em",whiteSpace:"nowrap"}}>
+              {copied?"コピー済！":"URLをコピー"}</button>
             <button onClick={()=>setAmazonModal(true)}
               style={{background:"none",border:`1px solid #c0a880`,cursor:"pointer",padding:"5px 12px",
                 color:"#7a6040",fontSize:10,letterSpacing:"0.05em",whiteSpace:"nowrap"}}>紙の本を探す</button>
@@ -655,10 +660,51 @@ export default function App() {
   const [query,setQuery]       = useState("");
   const [results,setResults]   = useState(null);
   const [loading,setLoading]   = useState(null);
-  const [catEnabled,setCatEnabled] = useState(false);
-  const [dragX,setDragX]       = useState(0);
-  const swipeRef               = useRef(null);
+  const [catEnabled,setCatEnabled]     = useState(false);
+  const [dragX,setDragX]               = useState(0);
+  const swipeRef                       = useRef(null);
+  const [sortOrder,setSortOrder]       = useState('default');
+  const [pendingBookId,setPendingBookId] = useState(null);
   const { catalog, loading: catLoading } = useCatalog(catEnabled);
+
+  // ─── ハッシュルーティング ───
+  // 本を開いたらURLハッシュを更新
+  useEffect(()=>{
+    const hash = reading ? '#'+reading.id : '';
+    if(window.location.hash !== hash)
+      window.history.pushState(null,'', window.location.pathname + hash);
+  }, [reading]);
+
+  // ブラウザ戻る/進むでreading状態を同期
+  useEffect(()=>{
+    function onPop(){
+      const id = window.location.hash.slice(1);
+      if(!id){ setReading(null); return; }
+      const pop = POPULAR.find(b=>b.id===id);
+      if(pop){ setReading(pop); return; }
+      setPendingBookId(id); setCatEnabled(true);
+    }
+    window.addEventListener('popstate', onPop);
+    return ()=>window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // 初回ロード時にハッシュから本を開く
+  useEffect(()=>{
+    const id = window.location.hash.slice(1);
+    if(!id) return;
+    window.history.replaceState(null,'', window.location.pathname); // homeエントリ確保
+    const pop = POPULAR.find(b=>b.id===id);
+    if(pop){ setReading(pop); return; }
+    setPendingBookId(id); setCatEnabled(true);
+  }, []); // eslint-disable-line
+
+  // カタログロード後にpendingの本を開く
+  useEffect(()=>{
+    if(!pendingBookId || !catalog) return;
+    const book = catalog.find(b=>b.id===pendingBookId);
+    if(book) setReading(book);
+    setPendingBookId(null);
+  }, [catalog, pendingBookId]);
 
   function switchTab(s){ setTab(s); if(s==="search") setCatEnabled(true); }
 
@@ -853,8 +899,32 @@ export default function App() {
               </>
             )}
 
-            {results!==null&&(
+            {results!==null&&(()=>{
+              const sorted = sortOrder==='default' ? results
+                : [...results].sort((a,b)=>{
+                    if(sortOrder==='title')  return (a.yomi||a.title).localeCompare(b.yomi||b.title,'ja');
+                    if(sortOrder==='author') return (a.authorYomi||a.author).localeCompare(b.authorYomi||b.author,'ja');
+                    if(sortOrder==='popular'){
+                      const pi=b=>POPULAR.findIndex(p=>p.title===b.title&&p.author===b.author);
+                      const ia=pi(a), ib=pi(b);
+                      if(ia>=0&&ib<0) return -1; if(ia<0&&ib>=0) return 1;
+                      if(ia>=0&&ib>=0) return ia-ib;
+                      return 0;
+                    }
+                    return 0;
+                  });
+              return (
               <>
+                {/* ソートボタン */}
+                <div style={{display:"flex",gap:4,marginBottom:10,flexWrap:"wrap"}}>
+                  {[['default','デフォルト'],['title','作品名順'],['author','著者名順'],['popular','人気順']].map(([s,label])=>(
+                    <button key={s} onClick={()=>setSortOrder(s)}
+                      style={{background:sortOrder===s?"#2a1800":"transparent",color:sortOrder===s?"#f7f2e8":"#5a4030",
+                        border:"1px solid #c0a880",padding:"3px 10px",fontSize:11,cursor:"pointer",letterSpacing:"0.05em"}}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <div style={{fontSize:13,letterSpacing:"0.2em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:6,marginBottom:14}}>
                   {results.length>0?`${results.length} 件（全${catalog?catalog.length.toLocaleString():"？"}作品から）`:"見つかりませんでした"}
                   <button onClick={()=>{setResults(null);setQuery("");}}
@@ -863,7 +933,7 @@ export default function App() {
                   </button>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:9}}>
-                  {results.map(book=>(
+                  {sorted.map(book=>(
                     <div key={book.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",background:"rgba(255,255,255,0.4)",border:"1px solid rgba(192,168,136,0.28)"}}>
                       <BunkoCover book={book} size="small" onClick={()=>setReading(book)}/>
                       <div style={{flex:1}}>
@@ -882,7 +952,7 @@ export default function App() {
                   ))}
                 </div>
               </>
-            )}
+              );})()}
           </div>
 
           {/* ════ 読みたいパネル ════ */}
