@@ -235,48 +235,18 @@ function AmazonModal({ book, onClose }) {
 }
 
 /* ─── ルビパーサー ─── */
-// 《よみ》形式のルビを解析してセグメント配列に変換
-function parseRubySegments(text) {
-  const segments = [];
-  let rest = text;
-  while (rest.length > 0) {
-    const open = rest.indexOf('《');
-    if (open === -1) { segments.push({ base: rest, ruby: null }); break; }
-    const close = rest.indexOf('》', open);
-    if (close === -1) { segments.push({ base: rest, ruby: null }); break; }
-    const before = rest.slice(0, open);
-    const reading = rest.slice(open + 1, close);
-    // ｜記号で明示された親文字
-    const pipe = before.lastIndexOf('｜');
-    if (pipe !== -1) {
-      if (pipe > 0) segments.push({ base: before.slice(0, pipe), ruby: null });
-      segments.push({ base: before.slice(pipe + 1), ruby: reading });
-    } else {
-      // 直前の連続した漢字・仮名を親文字とする
-      const m = before.match(/([぀-ヿ一-鿿豈-﫿Ã-ÿ]+)$/u);
-      if (m) {
-        const prefix = before.slice(0, before.length - m[0].length);
-        if (prefix) segments.push({ base: prefix, ruby: null });
-        segments.push({ base: m[0], ruby: reading });
-      } else {
-        if (before) segments.push({ base: before, ruby: null });
-        segments.push({ base: reading, ruby: null });
-      }
-    }
-    rest = rest.slice(close + 1);
-  }
-  return segments;
+// 《よみ》形式 → <ruby>漢字<rt>よみ</rt></ruby> HTML文字列に変換
+function rubyToHtml(text) {
+  // ｜base《ruby》 形式
+  let r = text.replace(/｜([^｜《》]+)《([^》]+)》/g,
+    '<ruby>$1<rt style="font-size:0.5em;letter-spacing:0.05em">$2</rt></ruby>');
+  // kanji《ruby》 形式（直前の漢字・仮名を親文字とする）
+  r = r.replace(/([぀-ヿ一-鿿㐀-䶿豈-﫿]+)《([^》]+)》/g,
+    '<ruby>$1<rt style="font-size:0.5em;letter-spacing:0.05em">$2</rt></ruby>');
+  // 残りの《》は除去
+  r = r.replace(/《[^》]*》/g, '');
+  return r;
 }
-
-function RubyText({ text }) {
-  const segs = parseRubySegments(text);
-  return <>{segs.map((s, i) =>
-    s.ruby
-      ? <ruby key={i}>{s.base}<rt style={{fontSize:"0.5em",letterSpacing:"0.05em"}}>{s.ruby}</rt></ruby>
-      : <span key={i}>{s.base}</span>
-  )}</>;
-}
-
 // ルビを除いたベース文字数で位置を計算
 function splitAtBaseChar(text, n) {
   let count = 0, i = 0;
@@ -390,7 +360,7 @@ function PageReader({ book, text, onClose, fontSize, setFontSize }) {
           fontSize,lineHeight:2.25,letterSpacing:"0.08em",color:"#140800",
           whiteSpace:"pre-wrap",
           padding:"40px 24px",
-        }}><RubyText text={pages[page]}/></div>
+        }} dangerouslySetInnerHTML={{__html: rubyToHtml(pages[page])}}></div>
       </div>
 
       {/* ノンブル（タップでミニシークバー） */}
