@@ -281,8 +281,8 @@ function splitHtmlAtChar(html, n) {
 function paginateText(html, w, h, fontSize) {
   const usableH = h - 80;        // padding 40px × 上下
   const usableW = w - 80;        // right:24px + left:56px（左端クリップ防止）
-  const lineH   = fontSize * 2.25;  // 縦方向：1文字が占める高さ
-  const colW    = fontSize + 0.5;   // 0.5px余裕を持たせ余りゼロを防ぐ
+  const lineH   = fontSize * 2.25;  // 縦方向：1文字が占める高さ（＝vertical-rlのカラム幅）
+  const colW    = lineH;            // vertical-rlでは line-height がカラム幅を決める
   const charsPerCol = Math.max(1, Math.floor(usableH / lineH));
   const colsPerPage = Math.max(1, Math.floor(usableW / colW));
   const cpp         = Math.max(1, charsPerCol * colsPerPage);
@@ -374,7 +374,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   const totalPages = pages.length;
   const nextP = ()=>setPage(p=>Math.min(p+1,totalPages-1));
   const prevP = ()=>setPage(p=>Math.max(p-1,0));
-  const FS = [13,16,19,22];
+  const FS = [16,19,22];
 
   // ページ送りアニメ（スワイプ・タップ共通）
   function goNext(){
@@ -408,8 +408,10 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
     const dx=e.changedTouches[0].clientX-s.x;
     const dy=e.changedTouches[0].clientY-s.y;
     if(s.locked==='h'&&Math.abs(dx)>40){
-      // 右スワイプ=次ページ、左スワイプ=前ページ
-      if(dx>0) goNext(); else goPrev();
+      // 右スワイプ=次ページ、左スワイプ=前ページ（境界ではスナップバック）
+      if(dx>0 && page<totalPages-1){ goNext(); }
+      else if(dx<0 && page>0){ goPrev(); }
+      else { setPageAnimating(true); setDragPageX(0); setTimeout(()=>setPageAnimating(false),260); }
     } else if(Math.abs(dx)<12&&Math.abs(dy)<12){
       // タップ処理（onTEで完結、onClickは発火しない）
       setDragPageX(0);
