@@ -278,40 +278,14 @@ function splitHtmlAtChar(html, n) {
 }
 
 /* ─── ページ分割 ─── */
-/**
- * vertical-rl モードで実際にブラウザが使うカラム幅を DOM 測定で取得する。
- * line-height: 2.25 はカラム幅（block方向）を決めるが、実際の値はフォント実装依存のため測定が確実。
- */
-function measureColWidth(fontSize) {
-  try {
-    // 30文字を縦書き1カラムに収める高さを与えて幅を測定（単文字測定より正確）
-    const n = 30;
-    const el = document.createElement('div');
-    el.setAttribute('style',
-      `position:fixed;visibility:hidden;pointer-events:none;top:0;left:0;display:inline-block;` +
-      `writing-mode:vertical-rl;font-size:${fontSize}px;line-height:2.0;letter-spacing:0.08em;` +
-      `font-family:'Noto Serif JP','Yu Mincho',serif;` +
-      `height:${fontSize * (n + 2)}px;white-space:normal;`
-    );
-    el.textContent = 'あ'.repeat(n);
-    document.body.appendChild(el);
-    const w = el.getBoundingClientRect().width;
-    document.body.removeChild(el);
-    return (w >= fontSize * 0.9 && w <= fontSize * 3.5) ? w : fontSize * 2.0;
-  } catch { return fontSize * 2.0; }
-}
-
-function paginateText(html, w, h, fontSize, colW) {
-  const usableH = h - 80;        // padding 40px × 上下
-  const usableW = w - 56;        // 左右 28px padding × 2
-  // 測定値が小さすぎる場合でも fontSize*1.8 を下限にする（Safari iOS 対策）
-  const effectiveColW = Math.max(
-    (colW && colW >= fontSize * 0.9 ? colW : fontSize * 2.0),
-    fontSize * 1.8
-  );
+function paginateText(html, w, h, fontSize) {
+  // CSS仕様: writing-mode:vertical-rl では line-height がカラム幅を決める
+  const colW      = fontSize * 2.0;   // line-height: 2.0 × font-size
+  const usableH   = h - 104;          // padding: 64px上 + 40px下 = 104px
+  const usableW   = w - 56;           // padding: 28px × 2 = 56px
   const charsPerCol = Math.max(1, Math.floor(usableH / fontSize));
-  // -3 で余裕を確保（フォントメトリクス差・測定誤差を吸収）
-  const colsPerPage = Math.max(1, Math.floor(usableW / effectiveColW) - 3);
+  // -2 バッファ（右端・左端に余裕）
+  const colsPerPage = Math.max(1, Math.floor(usableW / colW) - 2);
   const cpp         = Math.max(1, charsPerCol * colsPerPage);
   const pages = [];
   let pos = 0;
@@ -339,7 +313,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   const { text, loading: textLoading, error: textError } = useBookText(book);
   const saved = loadBookProgress(book.id);
   // ローディング・エラー時はここで早期 return できないため hooks は全て上で呼ぶ
-  const initPages = ()=> paginateText(text || "", window.innerWidth, window.innerHeight, fontSize, fontSize * 1.5);
+  const initPages = ()=> paginateText(text || "", window.innerWidth, window.innerHeight, fontSize);
   const [pages,setPages]           = useState(initPages);
   const [page,setPage]             = useState(saved.page ?? 0);
   const [bookmarks,setBookmarks]   = useState(saved.bookmarks ?? []);
@@ -355,23 +329,15 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   const containerRef = useRef(null);
   const touchStart   = useRef(null);
 
-  // フォントサイズ・テキスト変更時にページを再計算（DOM測定でカラム幅を取得）
+  // フォントサイズ・テキスト変更時にページを再計算
   useEffect(()=>{
     if(!text) return;
-    // visualViewport で iOS Safari の実表示幅を正確に取得
     const vv = window.visualViewport;
     const w  = vv ? vv.width  : (containerRef.current?.clientWidth  ?? window.innerWidth);
     const h  = vv ? vv.height : (containerRef.current?.clientHeight ?? window.innerHeight);
-    let cancelled = false;
-    (async()=>{
-      await document.fonts.ready; // フォントロード後に測定
-      if(cancelled) return;
-      const colW = measureColWidth(fontSize);
-      const np   = paginateText(text, w, h, fontSize, colW);
-      setPages(np);
-      setPage(p => Math.min(p, Math.max(0, np.length - 1)));
-    })();
-    return ()=>{ cancelled = true; };
+    const np = paginateText(text, w, h, fontSize);
+    setPages(np);
+    setPage(p => Math.min(p, Math.max(0, np.length - 1)));
   }, [text, fontSize]);
 
   // ページ・栞の変更を保存

@@ -26,6 +26,12 @@ function resolveGaiji(alt) {
 export function processAozoraHtml(arrayBuffer) {
   let html = new TextDecoder('shift_jis').decode(arrayBuffer);
 
+  // 0. main_text div を先に抽出してタイトル・著者ヘッダーを除外
+  const mainMatch = html.match(/<div[^>]+class=["']?main_text["']?[^>]*>([\s\S]*?)<\/div>/i);
+  if (mainMatch) {
+    html = mainMatch[1];
+  }
+
   // 1. 外字画像を先に変換（<rb>内にある場合があるため）
   html = html.replace(/<img[^>]*alt="([^"]*)"[^>]*/gi, (_, alt) => resolveGaiji(alt));
 
@@ -71,11 +77,20 @@ export function processAozoraHtml(arrayBuffer) {
   let start = 0;
   let end = lines.length;
 
-  // 本文開始：最初の実質的な行
+  // 本文開始：区切り線（--------等）の後（main_text抽出できなかった場合のフォールバック）
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].length > 0 && !lines[i].match(/^[-—＿─＊]+$/) && i > 3) {
-      start = i;
+    if (lines[i].match(/^[-—＿─＊━]{3,}$/)) {
+      start = i + 1;
+      while (start < lines.length && (lines[start].length === 0 || lines[start].match(/^[-—＿─＊━]+$/))) {
+        start++;
+      }
       break;
+    }
+  }
+  // 区切り線が見つからない場合
+  if (start === 0) {
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].length > 0 && i > 3) { start = i; break; }
     }
   }
 
