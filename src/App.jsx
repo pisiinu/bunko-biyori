@@ -351,9 +351,10 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   // フォントサイズ・テキスト変更時にページを再計算（DOM測定でカラム幅を取得）
   useEffect(()=>{
     if(!text) return;
-    const el = containerRef.current;
-    const w  = el ? el.clientWidth  : window.innerWidth;
-    const h  = el ? el.clientHeight : window.innerHeight;
+    // visualViewport で iOS Safari の実表示幅を正確に取得
+    const vv = window.visualViewport;
+    const w  = vv ? vv.width  : (containerRef.current?.clientWidth  ?? window.innerWidth);
+    const h  = vv ? vv.height : (containerRef.current?.clientHeight ?? window.innerHeight);
     let cancelled = false;
     (async()=>{
       await document.fonts.ready; // フォントロード後に測定
@@ -508,12 +509,15 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
             transform:`translateX(calc(${offset}))`,
             transition:pageAnimating?"transform 0.25s ease":"none",
           }}>
-            <div style={{
-              writingMode:"vertical-rl",textOrientation:"mixed",
-              height:"100%",width:"100%",overflow:"hidden",
-              fontSize,lineHeight:1.8,letterSpacing:"0.08em",color:"#140800",
-              whiteSpace:"pre-wrap",padding:"64px 24px 40px 56px",
-            }} dangerouslySetInnerHTML={{__html:pages[p]}}/>
+            {/* left:56/right:24 のクリップコンテナ：overflow:hidden がテキスト領域の境界でクリップ */}
+            <div style={{position:"absolute",top:0,bottom:0,left:56,right:24,overflow:"hidden"}}>
+              <div style={{
+                writingMode:"vertical-rl",textOrientation:"mixed",
+                height:"100%",width:"100%",overflow:"hidden",
+                fontSize,lineHeight:1.8,letterSpacing:"0.08em",color:"#140800",
+                whiteSpace:"pre-wrap",padding:"64px 0 40px 0",
+              }} dangerouslySetInnerHTML={{__html:pages[p]}}/>
+            </div>
           </div>
         ))}
       </div>
