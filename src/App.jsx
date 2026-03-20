@@ -307,7 +307,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
     const el = containerRef.current;
     const w  = el ? el.clientWidth  : window.innerWidth;
     const h  = el ? el.clientHeight : window.innerHeight;
-    const np = paginateText(text, w, h, fontSize);
+    const np = paginateText(text || "", w, h, fontSize);
     setPages(np);
     setPage(p => Math.min(p, Math.max(0, np.length - 1)));
   }, [text, fontSize]);
