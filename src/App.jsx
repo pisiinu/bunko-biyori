@@ -321,9 +321,11 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   const [miniSeek,setMiniSeek]     = useState(false);
   const [amazonModal,setAmazonModal] = useState(false);
 
+  const [dragPageX,setDragPageX]       = useState(0);
+  const [pageAnimating,setPageAnimating] = useState(false);
+
   const containerRef = useRef(null);
   const touchStart   = useRef(null);
-  const didSwipe     = useRef(false);
 
   // フォントサイズ・テキスト変更時にページを再計算（テキスト未取得時はスキップ）
   useEffect(()=>{
@@ -373,20 +375,42 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   const prevP = ()=>setPage(p=>Math.max(p-1,0));
   const FS = [13,16,19,22];
 
-  // タッチ判定
-  function onTS(e){ touchStart.current={x:e.touches[0].clientX,y:e.touches[0].clientY}; didSwipe.current=false; }
-  function onTM(e){ if(touchStart.current&&Math.abs(e.touches[0].clientX-touchStart.current.x)>10) didSwipe.current=true; }
+  // タッチ判定（ページフリップアニメ＋dead zone）
+  function onTS(e){
+    const w=containerRef.current?containerRef.current.clientWidth:window.innerWidth;
+    touchStart.current={x:e.touches[0].clientX,y:e.touches[0].clientY,locked:null,w};
+    setPageAnimating(false);
+  }
+  function onTM(e){
+    const s=touchStart.current; if(!s) return;
+    const dx=e.touches[0].clientX-s.x, dy=e.touches[0].clientY-s.y;
+    if(s.locked===null){ if(Math.abs(dx)<6&&Math.abs(dy)<6) return; s.locked=Math.abs(dx)>Math.abs(dy)?'h':'v'; }
+    if(s.locked==='h') setDragPageX(dx);
+  }
   function onTE(e){
-    if(!touchStart.current) return;
-    const dx=e.changedTouches[0].clientX-touchStart.current.x;
-    const dy=e.changedTouches[0].clientY-touchStart.current.y;
-    if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)){
-      // 右スワイプ=次ページ、左スワイプ=前ページ
-      dx>0 ? nextP() : prevP();
-    } else if(!didSwipe.current&&Math.abs(dx)<12&&Math.abs(dy)<12){
-      setOverlay(v=>!v); setMiniSeek(false);
+    const s=touchStart.current; touchStart.current=null; if(!s) return;
+    const dx=e.changedTouches[0].clientX-s.x;
+    const dy=e.changedTouches[0].clientY-s.y;
+    if(s.locked==='h'&&Math.abs(dx)>40){
+      // 右スワイプ=次ページ、左スワイプ=前ページ（アニメ付き）
+      if(dx>0&&page<totalPages-1){
+        setPageAnimating(true); setDragPageX(s.w);
+        setTimeout(()=>{ nextP(); setPageAnimating(false); setDragPageX(0); }, 260);
+      } else if(dx<0&&page>0){
+        setPageAnimating(true); setDragPageX(-s.w);
+        setTimeout(()=>{ prevP(); setPageAnimating(false); setDragPageX(0); }, 260);
+      } else {
+        setPageAnimating(true); setDragPageX(0); setTimeout(()=>setPageAnimating(false),260);
+      }
+    } else if(Math.abs(dx)<12&&Math.abs(dy)<12){
+      // タップ（上下dead zone内はメニュー非表示）
+      const y=s.y, h=window.innerHeight;
+      if(y>=64&&y<=h-56){ setOverlay(v=>!v); setMiniSeek(false); }
+      setDragPageX(0);
+    } else {
+      // スナップバック
+      setPageAnimating(true); setDragPageX(0); setTimeout(()=>setPageAnimating(false),260);
     }
-    touchStart.current=null;
   }
 
   const hasBmHere = !!bookmarks.find(b=>b.page===page);
@@ -412,7 +436,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
         </div>
       )}
 
-      {/* 本文 — pages[page] を直接レンダリング（translateX不要） */}
+      {/* 本文 — 3パネルスライダー（ページフリップアニメ） */}
       <div
         ref={containerRef}
         onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE}
@@ -424,13 +448,24 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
         style={{position:"absolute",inset:0,overflow:"hidden",cursor:"pointer",
           opacity:overlay?0.16:1,transition:"opacity 0.22s"}}
       >
-        <div style={{
-          writingMode:"vertical-rl",textOrientation:"mixed",
-          height:"100%",width:"100%",overflow:"hidden",
-          fontSize,lineHeight:2.25,letterSpacing:"0.08em",color:"#140800",
-          whiteSpace:"pre-wrap",
-          padding:"64px 24px 40px",
-        }} dangerouslySetInnerHTML={{__html: pages[page]}}></div>
+        {[
+          {p:Math.max(0,page-1),          offset:` 100% + ${dragPageX}px`},
+          {p:page,                         offset:`${dragPageX}px`},
+          {p:Math.min(pages.length-1,page+1), offset:`-100% + ${dragPageX}px`},
+        ].map(({p,offset},i)=>(
+          <div key={i} style={{
+            position:"absolute",inset:0,overflow:"hidden",
+            transform:`translateX(calc(${offset}))`,
+            transition:pageAnimating?"transform 0.25s ease":"none",
+          }}>
+            <div style={{
+              writingMode:"vertical-rl",textOrientation:"mixed",
+              height:"100%",width:"100%",overflow:"hidden",
+              fontSize,lineHeight:2.25,letterSpacing:"0.08em",color:"#140800",
+              whiteSpace:"pre-wrap",padding:"64px 24px 40px",
+            }} dangerouslySetInnerHTML={{__html:pages[p]}}/>
+          </div>
+        ))}
       </div>
 
       {/* ノンブル（タップでミニシークバー） */}
@@ -821,7 +856,9 @@ export default function App() {
                           <div style={{fontSize:14,fontWeight:700,color:"#1a0800"}}>{book.title}</div>
                           <WantBtn id={book.id} wantList={wantList} toggle={toggleWant}/>
                         </div>
-                        <div style={{fontSize:11,color:"#7a6040",marginBottom:8}}>{book.author}</div>
+                        <div style={{fontSize:11,color:"#7a6040"}}>{book.author}</div>
+                        {book.variant&&<div style={{fontSize:10,color:"#b09060",letterSpacing:"0.04em",marginBottom:6}}>{book.variant}</div>}
+                        {!book.variant&&<div style={{marginBottom:8}}/>}
                         <button onClick={()=>setReading(book)}
                           style={{background:"none",border:"1px solid #8a6a40",color:"#5a3a18",padding:"4px 12px",cursor:"pointer",fontSize:11,letterSpacing:"0.08em"}}>今すぐ読む</button>
                       </div>
@@ -853,7 +890,9 @@ export default function App() {
                         <div style={{fontSize:14,fontWeight:700,color:"#1a0800"}}>{book.title}</div>
                         <WantBtn id={book.id} wantList={wantList} toggle={toggleWant}/>
                       </div>
-                      <div style={{fontSize:11,color:"#7a6040",marginBottom:8}}>{book.author}</div>
+                      <div style={{fontSize:11,color:"#7a6040"}}>{book.author}</div>
+                      {book.variant&&<div style={{fontSize:10,color:"#b09060",letterSpacing:"0.04em",marginBottom:6}}>{book.variant}</div>}
+                      {!book.variant&&<div style={{marginBottom:8}}/>}
                       <button onClick={()=>setReading(book)}
                         style={{background:"none",border:"1px solid #8a6a40",color:"#5a3a18",padding:"4px 12px",cursor:"pointer",fontSize:11,letterSpacing:"0.08em"}}>今すぐ読む</button>
                     </div>

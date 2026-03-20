@@ -67,6 +67,7 @@ export function parseCatalogCsv(csvText) {
       author:     (sei + (mei ? ' ' + mei : '')).replace(/\s+/g, ''),
       authorYomi: seiYomi + meiYomi,
       url:        toRawUrl(htmlUrl),
+      variant:    cols[9] || '',   // 文字遣い種別（新字新仮名 等）
     });
   }
 
