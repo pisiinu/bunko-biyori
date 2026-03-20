@@ -567,6 +567,9 @@ function WantBtn({ id, wantList, toggle }) {
   );
 }
 
+/* ─── タブ定義 ─── */
+const TABS = ['shelf','search','wantlist'];
+
 /* ─── データ ─── */
 const POPULAR = [
   {id:"k773",   title:"こころ",         author:"夏目漱石",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000148/files/773_14560.html"},
@@ -602,7 +605,34 @@ export default function App() {
   const [query,setQuery]       = useState("");
   const [results,setResults]   = useState(null);
   const [loading,setLoading]   = useState(null);
-  const { catalog, loading: catLoading } = useCatalog(tab === "search");
+  const [catEnabled,setCatEnabled] = useState(false);
+  const [dragX,setDragX]       = useState(0);
+  const swipeRef               = useRef(null);
+  const { catalog, loading: catLoading } = useCatalog(catEnabled);
+
+  function switchTab(s){ setTab(s); if(s==="search") setCatEnabled(true); }
+
+  // ホーム画面の横スワイプ（タブ切替）
+  function onHomeSwipeStart(e){
+    swipeRef.current={x:e.touches[0].clientX,y:e.touches[0].clientY,locked:null};
+  }
+  function onHomeSwipeMove(e){
+    const s=swipeRef.current; if(!s) return;
+    const dx=e.touches[0].clientX-s.x, dy=e.touches[0].clientY-s.y;
+    if(s.locked===null){
+      if(Math.abs(dx)<6&&Math.abs(dy)<6) return;
+      s.locked=Math.abs(dx)>Math.abs(dy)?'h':'v';
+    }
+    if(s.locked==='h') setDragX(dx);
+  }
+  function onHomeSwipeEnd(e){
+    const s=swipeRef.current; swipeRef.current=null; setDragX(0);
+    if(!s||s.locked!=='h') return;
+    const dx=e.changedTouches[0].clientX-s.x;
+    const idx=TABS.indexOf(tab);
+    if(dx< -60&&idx<TABS.length-1) switchTab(TABS[idx+1]);
+    else if(dx>  60&&idx>0)         switchTab(TABS[idx-1]);
+  }
 
   function toggleWant(id){ setWantList(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]); }
   function save(book){
@@ -636,7 +666,7 @@ export default function App() {
     return (
       <button onClick={()=>!saved&&!full&&save(book)} disabled={saved||full||isL}
         style={{background:saved?"transparent":"#2a1800",color:saved?"#9a8060":"#f7f2e8",
-          border:"1px solid #c0a880",padding:"5px 12px",fontSize:10,
+          border:"1px solid #c0a880",padding:"5px 12px",fontSize:12,
           cursor:saved||full?"default":"pointer",letterSpacing:"0.08em",
           whiteSpace:"nowrap",opacity:isL?0.5:1}}>
         {isL?"…":saved?"保存済":full?`上限${MAX_SHELF}冊`:"書庫へ"}
@@ -657,24 +687,36 @@ export default function App() {
         </div>
         <div style={{display:"flex"}}>
           {[["shelf","書庫"],["search","検索"],["wantlist","読みたい"]].map(([s,label])=>(
-            <button key={s} onClick={()=>setTab(s)}
+            <button key={s} onClick={()=>switchTab(s)}
               style={{background:tab===s?"#2a1800":"transparent",color:tab===s?"#f7f2e8":"#5a4030",
                 border:"1px solid #c0a880",marginLeft:-1,padding:"6px 11px",cursor:"pointer",
-                fontSize:10,letterSpacing:"0.1em",transition:"all 0.15s"}}>
+                fontSize:13,letterSpacing:"0.1em",transition:"all 0.15s"}}>
               {label}
-              {s==="shelf"&&<span style={{fontSize:8,marginLeft:3,opacity:0.5}}>{shelf.length}/{MAX_SHELF}</span>}
-              {s==="wantlist"&&wantList.length>0&&<span style={{fontSize:8,marginLeft:3,opacity:0.5}}>{wantList.length}</span>}
+              {s==="shelf"&&<span style={{fontSize:10,marginLeft:3,opacity:0.5}}>{shelf.length}/{MAX_SHELF}</span>}
+              {s==="wantlist"&&wantList.length>0&&<span style={{fontSize:10,marginLeft:3,opacity:0.5}}>{wantList.length}</span>}
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{padding:"18px 20px 56px"}}>
+      {/* ─── 横スワイプスライダー ─── */}
+      <div style={{overflow:"hidden"}}>
+        <div
+          onTouchStart={onHomeSwipeStart}
+          onTouchMove={onHomeSwipeMove}
+          onTouchEnd={onHomeSwipeEnd}
+          style={{
+            display:"flex",
+            touchAction:"pan-y",
+            transform:`translateX(calc(-${TABS.indexOf(tab)*100}% + ${dragX}px))`,
+            transition:dragX===0?"transform 0.28s ease":"none",
+            willChange:"transform",
+          }}
+        >
 
-        {/* ════ 書庫 ════ */}
-        {tab==="shelf"&&(
-          <>
-            <div style={{fontSize:10,letterSpacing:"0.2em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:7,marginBottom:18}}>
+          {/* ════ 書庫パネル ════ */}
+          <div style={{minWidth:"100%",boxSizing:"border-box",padding:"18px 20px 56px"}}>
+            <div style={{fontSize:13,letterSpacing:"0.2em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:7,marginBottom:18}}>
               書庫　{shelf.length} 冊 ／ 最大 {MAX_SHELF} 冊
             </div>
             {shelf.length===0?(
@@ -691,13 +733,12 @@ export default function App() {
                           badge={i===shelf.length-1&&shelf.length>1?"NEW":null}/>
                         <div style={{display:"flex",alignItems:"center",gap:2}}>
                           <WantBtn id={book.id} wantList={wantList} toggle={toggleWant}/>
-                          {/* 本を返すボタン */}
                           <button
                             onClick={e=>{e.stopPropagation();removeFromShelf(book.id);}}
                             title="書庫から返す"
                             style={{background:"none",border:"1px solid rgba(140,110,70,0.35)",
                               color:"rgba(100,70,40,0.5)",cursor:"pointer",
-                              fontSize:8,padding:"2px 6px",letterSpacing:"0.05em",
+                              fontSize:11,padding:"2px 6px",letterSpacing:"0.05em",
                               transition:"all 0.12s"}}
                             onMouseEnter={e=>{e.currentTarget.style.color="#8a5030";e.currentTarget.style.borderColor="#c0a060";}}
                             onMouseLeave={e=>{e.currentTarget.style.color="rgba(100,70,40,0.5)";e.currentTarget.style.borderColor="rgba(140,110,70,0.35)";}}>
@@ -712,28 +753,26 @@ export default function App() {
                   </div>
                   <div style={{height:5,marginTop:10,background:"linear-gradient(180deg,#b09060 0%,#9a7848 100%)",borderRadius:2,boxShadow:"0 2px 4px rgba(0,0,0,0.16)"}}/>
                 </div>
-                <div style={{marginTop:10,fontSize:10,color:"#9a8060",textAlign:"center",letterSpacing:"0.14em"}}>
+                <div style={{marginTop:10,fontSize:11,color:"#9a8060",textAlign:"center",letterSpacing:"0.14em"}}>
                   表紙をタップして読む　★で読みたい一覧へ
                 </div>
               </>
             )}
-          </>
-        )}
+          </div>
 
-        {/* ════ 検索 ════ */}
-        {tab==="search"&&(
-          <>
+          {/* ════ 検索パネル ════ */}
+          <div style={{minWidth:"100%",boxSizing:"border-box",padding:"18px 20px 56px"}}>
             <form onSubmit={doSearch} style={{display:"flex",marginBottom:18}}>
               <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="作品名・著者名で検索"
                 style={{flex:1,padding:"10px 14px",border:"1px solid #c0a880",borderRight:"none",
                   background:"rgba(255,255,255,0.6)",fontSize:16,fontFamily:"inherit",outline:"none",color:"#1a0800"}}/>
-              <button type="submit" style={{background:"#2a1800",color:"#f7f2e8",border:"none",padding:"10px 16px",cursor:"pointer",fontSize:12,letterSpacing:"0.1em"}}>検索</button>
+              <button type="submit" style={{background:"#2a1800",color:"#f7f2e8",border:"none",padding:"10px 16px",cursor:"pointer",fontSize:13,letterSpacing:"0.1em"}}>検索</button>
             </form>
 
-            {catLoading&&<div style={{fontSize:10,color:"#9a7050",letterSpacing:"0.15em",textAlign:"center",padding:"8px 0",marginBottom:8}}>カタログ読み込み中…</div>}
+            {catLoading&&<div style={{fontSize:11,color:"#9a7050",letterSpacing:"0.15em",textAlign:"center",padding:"8px 0",marginBottom:8}}>カタログ読み込み中…</div>}
             {results===null&&(
               <>
-                <div style={{fontSize:10,letterSpacing:"0.28em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:6,marginBottom:16}}>人気ランキング</div>
+                <div style={{fontSize:13,letterSpacing:"0.28em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:6,marginBottom:16}}>人気ランキング</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                   {POPULAR.map((book,i)=>{
                     const saved=!!shelf.find(b=>b.id===book.id);
@@ -746,14 +785,14 @@ export default function App() {
                           <div style={{position:"absolute",top:-5,left:-5,width:19,height:19,
                             background:i<3?"#8a5a30":"#6a5040",color:"#f7f2e8",borderRadius:"50%",
                             display:"flex",alignItems:"center",justifyContent:"center",
-                            fontSize:8,fontWeight:700,boxShadow:"0 1px 4px rgba(0,0,0,0.22)"}}>{i+1}</div>
+                            fontSize:10,fontWeight:700,boxShadow:"0 1px 4px rgba(0,0,0,0.22)"}}>{i+1}</div>
                         </div>
                         <div style={{display:"flex",alignItems:"center",gap:3}}>
                           <WantBtn id={book.id} wantList={wantList} toggle={toggleWant}/>
                           <button onClick={()=>!saved&&!full&&save(book)}
                             style={{background:"none",border:"1px solid #c0a880",
                               color:saved?"#9a8060":"#5a4030",padding:"3px 9px",
-                              cursor:saved||full?"default":"pointer",fontSize:9,letterSpacing:"0.05em"}}>
+                              cursor:saved||full?"default":"pointer",fontSize:12,letterSpacing:"0.05em"}}>
                             {isL?"…":saved?"保存済":full?"満杯":"書庫へ"}
                           </button>
                         </div>
@@ -766,10 +805,10 @@ export default function App() {
 
             {results!==null&&(
               <>
-                <div style={{fontSize:10,letterSpacing:"0.2em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:6,marginBottom:14}}>
+                <div style={{fontSize:13,letterSpacing:"0.2em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:6,marginBottom:14}}>
                   {results.length>0?`${results.length} 件（全${catalog?catalog.length.toLocaleString():"？"}作品から）`:"見つかりませんでした"}
                   <button onClick={()=>{setResults(null);setQuery("");}}
-                    style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"#9a8060",marginLeft:10,textDecoration:"underline"}}>
+                    style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"#9a8060",marginLeft:10,textDecoration:"underline"}}>
                     ランキングへ戻る
                   </button>
                 </div>
@@ -784,7 +823,7 @@ export default function App() {
                         </div>
                         <div style={{fontSize:11,color:"#7a6040",marginBottom:8}}>{book.author}</div>
                         <button onClick={()=>setReading(book)}
-                          style={{background:"none",border:"1px solid #8a6a40",color:"#5a3a18",padding:"4px 12px",cursor:"pointer",fontSize:10,letterSpacing:"0.08em"}}>今すぐ読む</button>
+                          style={{background:"none",border:"1px solid #8a6a40",color:"#5a3a18",padding:"4px 12px",cursor:"pointer",fontSize:11,letterSpacing:"0.08em"}}>今すぐ読む</button>
                       </div>
                       <SaveBtn book={book}/>
                     </div>
@@ -792,13 +831,11 @@ export default function App() {
                 </div>
               </>
             )}
-          </>
-        )}
+          </div>
 
-        {/* ════ 読みたい ════ */}
-        {tab==="wantlist"&&(
-          <>
-            <div style={{fontSize:10,letterSpacing:"0.2em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:7,marginBottom:18}}>
+          {/* ════ 読みたいパネル ════ */}
+          <div style={{minWidth:"100%",boxSizing:"border-box",padding:"18px 20px 56px"}}>
+            <div style={{fontSize:13,letterSpacing:"0.2em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:7,marginBottom:18}}>
               読みたい本　{wantedBooks.length} 冊
             </div>
             {wantedBooks.length===0?(
@@ -818,16 +855,16 @@ export default function App() {
                       </div>
                       <div style={{fontSize:11,color:"#7a6040",marginBottom:8}}>{book.author}</div>
                       <button onClick={()=>setReading(book)}
-                        style={{background:"none",border:"1px solid #8a6a40",color:"#5a3a18",padding:"4px 12px",cursor:"pointer",fontSize:10,letterSpacing:"0.08em"}}>今すぐ読む</button>
+                        style={{background:"none",border:"1px solid #8a6a40",color:"#5a3a18",padding:"4px 12px",cursor:"pointer",fontSize:11,letterSpacing:"0.08em"}}>今すぐ読む</button>
                     </div>
                     <SaveBtn book={book}/>
                   </div>
                 ))}
               </div>
             )}
-          </>
-        )}
+          </div>
 
+        </div>
       </div>
     </div>
   );
