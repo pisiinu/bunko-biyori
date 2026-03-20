@@ -62,13 +62,13 @@ function OrnamentFrame({ accent, w, h }) {
 }
 
 /* ─── 文庫表紙 ─── */
-function BunkoCover({ book, size="normal", onClick, badge }) {
+function BunkoCover({ book, size="normal", onClick, badge, width:wOvr }) {
   const [hov,setHov] = useState(false);
   const c  = titleToBeige(book.title);
-  const w  = size==="small"?70:size==="large"?128:94;
+  const w  = wOvr ?? (size==="small"?70:size==="large"?128:94);
   const h  = Math.round(w*1.52);
-  const fs = size==="small"?9.5:size==="large"?16:12.5;
-  const fa = size==="small"?6.5:size==="large"?9:8;
+  const fs = w<80?9.5:w>110?16:12.5;
+  const fa = w<80?6.5:w>110?9:8;
   return (
     <div onClick={onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
       style={{
@@ -182,11 +182,10 @@ function TopBookmarkTabs({ bookmarks, onJump }) {
   const sorted = [...bookmarks].sort((a,b)=>a.page-b.page); // 小→大
   return (
     <div style={{
-      position:"absolute",top:0,right:16,zIndex:8,
-      display:"flex",flexDirection:"row",gap:4,
+      position:"absolute",top:0,right:12,zIndex:8,
+      display:"flex",flexDirection:"row",gap:6,
       pointerEvents:"none",
     }}>
-      {/* 右が最初のページ → sorted[0]が右端 → flex-direction:row-reverseで右から小ページ順 */}
       {[...sorted].reverse().map((bm,i)=>{
         const origIdx = bookmarks.indexOf(bm);
         const color = BM_COLORS[origIdx] ?? BM_COLORS[0];
@@ -195,14 +194,14 @@ function TopBookmarkTabs({ bookmarks, onJump }) {
             onClick={e=>{e.stopPropagation();onJump(bm.page);}}
             title={`栞${origIdx+1}：${bm.page+1}ページ`}
             style={{
-              width:16,height:20,
+              width:26,height:36,
               background:color,
-              borderRadius:"0 0 3px 3px",
+              borderRadius:"0 0 5px 5px",
               cursor:"pointer",pointerEvents:"all",
-              boxShadow:"0 1px 4px rgba(0,0,0,0.22)",
+              boxShadow:"0 2px 6px rgba(0,0,0,0.28)",
               display:"flex",alignItems:"center",justifyContent:"center",
             }}>
-            <div style={{width:4,height:4,background:"rgba(255,255,255,0.55)",borderRadius:"50%"}}/>
+            <div style={{width:5,height:5,background:"rgba(255,255,255,0.6)",borderRadius:"50%"}}/>
           </div>
         );
       })}
@@ -376,9 +375,9 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
 
       {/* 書名・著者名（左上・薄め） */}
       {!overlay&&!miniSeek&&(
-        <div style={{position:"absolute",top:26,left:14,zIndex:5,pointerEvents:"none"}}>
-          <div style={{fontSize:10,color:"rgba(90,60,20,0.35)",letterSpacing:"0.1em"}}>{book.title}</div>
-          <div style={{fontSize:9,color:"rgba(90,60,20,0.22)",letterSpacing:"0.08em",marginTop:2}}>{book.author}</div>
+        <div style={{position:"absolute",top:10,left:14,zIndex:5,pointerEvents:"none"}}>
+          <div style={{fontSize:10,color:"rgba(90,60,20,0.38)",letterSpacing:"0.1em"}}>{book.title}</div>
+          <div style={{fontSize:9,color:"rgba(90,60,20,0.25)",letterSpacing:"0.08em",marginTop:2}}>{book.author}</div>
         </div>
       )}
 
@@ -395,7 +394,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
           height:"100%",width:"100%",overflow:"hidden",
           fontSize,lineHeight:2.25,letterSpacing:"0.08em",color:"#140800",
           whiteSpace:"pre-wrap",
-          padding:"40px 24px",
+          padding:"64px 24px 40px",
         }} dangerouslySetInnerHTML={{__html: pages[page]}}></div>
       </div>
 
@@ -650,7 +649,7 @@ export default function App() {
             ):(
               <>
                 <div style={{background:"linear-gradient(180deg,#ddd0b2 0%,#c8b898 100%)",borderRadius:4,padding:"20px 16px 12px",border:"1px solid #b89870",boxShadow:"inset 0 2px 10px rgba(0,0,0,0.1)"}}>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:12,alignItems:"flex-end",minHeight:80}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                     {shelf.map((book,i)=>(
                       <div key={book.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
                         <BunkoCover book={book} size="normal" onClick={()=>setReading(book)}
@@ -692,7 +691,7 @@ export default function App() {
             <form onSubmit={doSearch} style={{display:"flex",marginBottom:18}}>
               <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="作品名・著者名で検索"
                 style={{flex:1,padding:"10px 14px",border:"1px solid #c0a880",borderRight:"none",
-                  background:"rgba(255,255,255,0.6)",fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a0800"}}/>
+                  background:"rgba(255,255,255,0.6)",fontSize:16,fontFamily:"inherit",outline:"none",color:"#1a0800"}}/>
               <button type="submit" style={{background:"#2a1800",color:"#f7f2e8",border:"none",padding:"10px 16px",cursor:"pointer",fontSize:12,letterSpacing:"0.1em"}}>検索</button>
             </form>
 
@@ -700,7 +699,7 @@ export default function App() {
             {results===null&&(
               <>
                 <div style={{fontSize:10,letterSpacing:"0.28em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:6,marginBottom:16}}>人気ランキング</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:14}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                   {POPULAR.map((book,i)=>{
                     const saved=!!shelf.find(b=>b.id===book.id);
                     const full=shelf.length>=MAX_SHELF;
