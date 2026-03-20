@@ -303,11 +303,15 @@ function measureColWidth(fontSize) {
 
 function paginateText(html, w, h, fontSize, colW) {
   const usableH = h - 80;        // padding 40px × 上下
-  const usableW = w - 80;        // right:24px + left:56px（左端クリップ防止）
-  const effectiveColW = (colW && colW >= fontSize) ? colW : fontSize * 2.0;
+  const usableW = w - 56;        // 左右 28px padding × 2
+  // 測定値が小さすぎる場合でも fontSize*1.8 を下限にする（Safari iOS 対策）
+  const effectiveColW = Math.max(
+    (colW && colW >= fontSize * 0.9 ? colW : fontSize * 2.0),
+    fontSize * 1.8
+  );
   const charsPerCol = Math.max(1, Math.floor(usableH / fontSize));
-  // -2 で2カラム分の余裕を確保（Safari iOS のフォントメトリクス差・測定誤差を吸収）
-  const colsPerPage = Math.max(1, Math.floor(usableW / effectiveColW) - 2);
+  // -3 で余裕を確保（フォントメトリクス差・測定誤差を吸収）
+  const colsPerPage = Math.max(1, Math.floor(usableW / effectiveColW) - 3);
   const cpp         = Math.max(1, charsPerCol * colsPerPage);
   const pages = [];
   let pos = 0;
@@ -478,7 +482,19 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
       {/* 上部栞タブ */}
       <TopBookmarkTabs bookmarks={bookmarks} lastRead={lastRead} onJump={jumpBm} onReturn={returnLast}/>
 
-      {/* 書名・著者名 — オーバーレイ内のみに表示（読書中は非表示） */}
+      {/* 書名 — 読書中は左上に薄く表示 */}
+      {!overlay&&(
+        <div style={{
+          position:"absolute",top:0,left:0,right:0,zIndex:5,
+          padding:"10px 14px",pointerEvents:"none",
+        }}>
+          <div style={{
+            fontSize:11,color:"rgba(60,35,10,0.38)",
+            letterSpacing:"0.08em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+            fontFamily:"'Noto Serif JP','Yu Mincho',serif",
+          }}>{book.title}</div>
+        </div>
+      )}
 
       {/* 本文 — 3パネルスライダー（ページフリップアニメ） */}
       <div
@@ -507,15 +523,12 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
             transition:pageAnimating?"transform 0.25s ease":"none",
           }}>
             {p !== null && (
-              /* left:56/right:24 のクリップコンテナ：overflow:hidden がテキスト領域の境界でクリップ */
-              <div style={{position:"absolute",top:0,bottom:0,left:56,right:24,overflow:"hidden"}}>
-                <div style={{
-                  writingMode:"vertical-rl",textOrientation:"mixed",
-                  height:"100%",width:"100%",overflow:"hidden",
-                  fontSize,lineHeight:2.0,letterSpacing:"0.08em",color:"#140800",
-                  whiteSpace:"pre-wrap",padding:"64px 0 40px 0",
-                }} dangerouslySetInnerHTML={{__html:pages[p]}}/>
-              </div>
+              <div style={{
+                writingMode:"vertical-rl",textOrientation:"mixed",
+                height:"100%",width:"100%",overflow:"hidden",
+                fontSize,lineHeight:2.0,letterSpacing:"0.08em",color:"#140800",
+                whiteSpace:"pre-wrap",padding:"64px 28px 40px 28px",
+              }} dangerouslySetInnerHTML={{__html:pages[p]}}/>
             )}
           </div>
         ))}
