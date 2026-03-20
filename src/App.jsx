@@ -287,7 +287,7 @@ function measureColWidth(fontSize) {
     const el = document.createElement('div');
     el.setAttribute('style',
       'position:fixed;visibility:hidden;pointer-events:none;white-space:nowrap;top:0;left:0;' +
-      `writing-mode:vertical-rl;font-size:${fontSize}px;line-height:2.25;letter-spacing:0.08em;` +
+      `writing-mode:vertical-rl;font-size:${fontSize}px;line-height:1.8;letter-spacing:0.08em;` +
       "font-family:'Noto Serif JP','Yu Mincho',serif;"
     );
     el.textContent = 'あ';
@@ -477,8 +477,8 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
       {/* 書名・著者名（左上・薄め） */}
       {!overlay&&!miniSeek&&(
         <div style={{position:"absolute",top:10,left:14,zIndex:5,pointerEvents:"none"}}>
-          <div style={{fontSize:13,color:"rgba(90,60,20,0.42)",letterSpacing:"0.1em"}}>{book.title}</div>
-          <div style={{fontSize:11,color:"rgba(90,60,20,0.28)",letterSpacing:"0.08em",marginTop:2}}>{book.author}</div>
+          <div style={{fontSize:15,fontWeight:600,color:"rgba(90,60,20,0.38)",letterSpacing:"0.08em"}}>{book.title}</div>
+          <div style={{fontSize:11,color:"rgba(90,60,20,0.24)",letterSpacing:"0.06em",marginTop:2}}>{book.author}</div>
         </div>
       )}
 
@@ -511,7 +511,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
             <div style={{
               writingMode:"vertical-rl",textOrientation:"mixed",
               height:"100%",width:"100%",overflow:"hidden",
-              fontSize,lineHeight:2.25,letterSpacing:"0.08em",color:"#140800",
+              fontSize,lineHeight:1.8,letterSpacing:"0.08em",color:"#140800",
               whiteSpace:"pre-wrap",padding:"64px 24px 40px 56px",
             }} dangerouslySetInnerHTML={{__html:pages[p]}}/>
           </div>
@@ -559,10 +559,13 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
             <button onClick={onClose}
               style={{background:"none",border:`1px solid #c0a880`,cursor:"pointer",padding:"5px 12px",
                 color:"#5a3a18",fontSize:11,letterSpacing:"0.08em",whiteSpace:"nowrap"}}>本を閉じる</button>
-            <span style={{fontSize:13,fontWeight:700,color:"#1a0800",letterSpacing:"0.06em",flex:1}}>{book.title}</span>
+            <div style={{flex:1,minWidth:0,padding:"0 4px"}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#1a0800",letterSpacing:"0.06em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{book.title}</div>
+              <div style={{fontSize:11,color:"#7a6040",letterSpacing:"0.04em",marginTop:2}}>{book.author}</div>
+            </div>
             <button onClick={()=>setAmazonModal(true)}
-              style={{background:"#2a1800",border:"none",cursor:"pointer",padding:"8px 16px",
-                color:"#f7f2e8",fontSize:12,letterSpacing:"0.08em",whiteSpace:"nowrap"}}>紙の本を探す</button>
+              style={{background:"none",border:`1px solid #c0a880`,cursor:"pointer",padding:"7px 14px",
+                color:"#5a4030",fontSize:12,letterSpacing:"0.08em",whiteSpace:"nowrap"}}>紙の本を探す</button>
           </div>
           {/* 中央透過（タップで閉じる） */}
           <div style={{flex:1}}/>
