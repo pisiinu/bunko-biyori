@@ -434,12 +434,11 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
         ruby{-webkit-ruby-position:before;ruby-position:over}
         rt{font-size:0.5em}
         rp{display:none}
-        em.sesame_dot,em.sesame,em.傍点,em.ゴマ傍点,em.黒ゴマ傍点{font-style:normal;-webkit-text-emphasis:filled sesame;text-emphasis:filled sesame}
-        em.white_sesame_dot,em.白ゴマ傍点{font-style:normal;-webkit-text-emphasis:open sesame;text-emphasis:open sesame}
-        em.circle_dot,em.丸傍点,em.白丸傍点{font-style:normal;-webkit-text-emphasis:open circle;text-emphasis:open circle}
-        em.black_circle_dot,em.黒丸傍点{font-style:normal;-webkit-text-emphasis:filled circle;text-emphasis:filled circle}
-        em.triangle_dot,em.三角傍点{font-style:normal;-webkit-text-emphasis:filled triangle;text-emphasis:filled triangle}
-        span.gaiji{font-style:normal}
+        em.sesame_dot,em.sesame,em.傍点,em.ゴマ傍点,em.黒ゴマ傍点,strong.SESAME_DOT,strong.sesame_dot{font-style:normal;font-weight:normal;-webkit-text-emphasis:filled sesame;text-emphasis:filled sesame}
+        em.white_sesame_dot,em.白ゴマ傍点,strong.WHITE_SESAME_DOT{font-style:normal;font-weight:normal;-webkit-text-emphasis:open sesame;text-emphasis:open sesame}
+        em.circle_dot,em.丸傍点,em.白丸傍点,strong.CIRCLE_DOT{font-style:normal;font-weight:normal;-webkit-text-emphasis:open circle;text-emphasis:open circle}
+        em.black_circle_dot,em.黒丸傍点,strong.BLACK_CIRCLE_DOT{font-style:normal;font-weight:normal;-webkit-text-emphasis:filled circle;text-emphasis:filled circle}
+        em.triangle_dot,em.三角傍点,strong.TRIANGLE_DOT{font-style:normal;font-weight:normal;-webkit-text-emphasis:filled triangle;text-emphasis:filled triangle}
       `}</style>
 
       {/* 上部栞タブ */}
