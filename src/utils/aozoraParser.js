@@ -52,6 +52,14 @@ export function processAozoraHtml(arrayBuffer) {
     /<(?:strong|em)[^>]*class="(?:SESAME_DOT|sesame_dot|sesame|傍点|ゴマ傍点|黒ゴマ傍点)"[^>]*>([^<]*)<\/(?:strong|em)>/gi,
     (_, text) => [...text].map(ch => `<span class="sd">${ch}</span>`).join('')
   );
+  // インラインスタイルから margin-left を除去
+  // 横書き前提の margin-left は縦書きコンテキストで列高・配置に悪影響を与える
+  html = html.replace(/ style="([^"]*)"/gi, (_, styles) => {
+    const cleaned = styles.split(';')
+      .filter(s => !/^\s*margin-left\s*:/i.test(s))
+      .join(';').replace(/^;+|;+$/g, '').trim();
+    return cleaned ? ` style="${cleaned}"` : '';
+  });
   // 青空文庫注記 ［＃...］ を除去
   html = html.replace(/［＃[^］]*］/g, '');
   return html;
