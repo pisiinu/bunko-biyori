@@ -36,8 +36,9 @@ export function processAozoraHtml(arrayBuffer) {
     html = html.slice(tagEnd, sliceEnd);
   }
 
-  // 外字 img → Unicode（rb内・外どちらも）
-  html = html.replace(/<img[^>]*alt="([^"]*)"[^>]*\/?>/gi, (_, alt) => resolveGaiji(alt));
+  // 外字 img → Unicode（rb内・外どちらも）。<span class="gaiji"> で包みフォントを明示
+  // （iOSでNoto Serif JPにない文字のフォールバック切替がruby描画を壊す可能性への対策）
+  html = html.replace(/<img[^>]*alt="([^"]*)"[^>]*\/?>/gi, (_, alt) => `<span class="gaiji">${resolveGaiji(alt)}</span>`);
   // 残った img タグを除去
   html = html.replace(/<img[^>]*\/?>/gi, '');
   // <rp> を中身ごと除去（フォールバック括弧不要）

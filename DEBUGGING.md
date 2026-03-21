@@ -19,7 +19,8 @@
 | f714c00 | overflow:scroll と writing-mode:vertical-rl を別要素に分離、外側を`direction:rtl`に | 後の 88ee10b で元に戻された。scrollLeft 計算が iOS Safari では RTL でも正常動作した可能性あるが未確認 |
 | v11 | `ruby{display:inline-block;position:relative}` + `rt{position:absolute;writing-mode:vertical-rl;right:-1em;top:0}` writing-mode明示 | **未テスト** |
 | v12 | `<ruby>` → `<span class="rw">` に変換してネイティブrubyを回避。`display:inline;position:relative`、`rt{position:absolute;right:-1em;top:0}` | 漢字サイズは修正されたが、ルビ・傍点が完全消滅。原因: `display:inline;position:relative` はiOS Safariでabsolute childのcontaining blockを生成しない → overflow+writing-modeのスクロールコンテナ基準に配置され画面外へ |
-| v13 | `direction:rtl`外側div（overflow） + `direction:ltr;writing-mode:vertical-rl`内側div の分離。ネイティブ`<ruby>`を復元。`.sd{display:inline-block;position:relative}`、`::after{position:absolute;right:-0.55em}` | **未テスト（現在のバージョン）** |
+| v13 | `direction:rtl`外側div（overflow） + `direction:ltr;writing-mode:vertical-rl`内側div の分離。ネイティブ`<ruby>`を復元。`.sd{display:inline-block;position:relative}`、`::after{position:absolute;right:-0.55em}` | ルビ: 外字後のルビ依然消える。傍点: inline-blockで文字が小さくなった |
+| v14 | 外字を`<span class="gaiji">`で包みHiragino Mincho等を明示（フォントフォールバック切替によるruby破壊の仮説）。`.sd`を`display:inline`に戻す | **未テスト（現在のバージョン）** |
 
 **現在の HTML 構造（v13 処理後）**:
 ```html
