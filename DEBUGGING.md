@@ -14,8 +14,10 @@
 | v5 | `<rb>` タグをすべてグローバルに除去 | 全ルビが壊れる regression → 後に reverted |
 | v8 | `<rb><img.../></rb>` のみ対象を絞って除去（外字内の rb だけ処理） | 効果なし |
 | v9 | `<rb>` タグ全除去 + `<rp>` タグ中身ごと除去 → HTML5 ruby: `<ruby>base<rt>読み</rt></ruby>` | 効果なし |
-| a3c2e35 | native ruby を使わず position:absolute でルビを描画（CSS完全置換） | 後にrevertedされた（理由不明） |
-| f714c00 | overflow:scroll と writing-mode:vertical-rl を別要素に分離（iOS Safari対策） | 後の 88ee10b で元に戻された可能性あり |
+| v10 | `ruby{display:inline-flex;flex-direction:column-reverse}` でネイティブruby回避 | ルビのある文字が小さく見える（列幅1.5em < line-height 1.8em）、ルビは表示されず |
+| a3c2e35/5f54fc7 | `ruby{display:inline-block;position:relative}` + `rt{position:absolute;right:-0.6em}` でネイティブruby回避 | 「reversed ruby layout」でrevertedされた（原因：writing-modeをrtに明示しなかったため水平文字になった可能性） |
+| f714c00 | overflow:scroll と writing-mode:vertical-rl を別要素に分離、外側を`direction:rtl`に | 後の 88ee10b で元に戻された。scrollLeft 計算が iOS Safari では RTL でも正常動作した可能性あるが未確認 |
+| v11 | `ruby{display:inline-block;position:relative}` + `rt{position:absolute;writing-mode:vertical-rl;right:-1em;top:0}` writing-mode明示 | **未テスト** |
 
 **現在の HTML 構造（v9 処理後）**:
 ```html
