@@ -42,6 +42,8 @@ export function processAozoraHtml(arrayBuffer) {
   html = html.replace(/<img[^>]*\/?>/gi, '');
   // 青空文庫注記 ［＃...］ を除去
   html = html.replace(/［＃[^］]*］/g, '');
+  // <rb>タグを除去（HTML5非推奨; テキストはruby anonymous baseとして認識される）
+  html = html.replace(/<\/?rb>/gi, '');
 
   return html;
 }
