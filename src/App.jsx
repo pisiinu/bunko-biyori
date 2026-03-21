@@ -104,12 +104,11 @@ function BunkoCover({ book, size="normal", onClick, badge, width:wOvr }) {
 }
 
 /* ─── ドラッグ可能シークバー（右端=冒頭、左端=末尾） ─── */
-function Seekbar({ ratio, bookmarks, onSeek }) {
+function Seekbar({ ratio, bookmarks, onSeek, onJumpBm, lastReadRatio, onReturn }) {
   const trackRef = useRef(null);
-  const dragging = useRef(false);
+  const drag     = useRef(null); // { startX, moved }
 
   // ratio 0=冒頭(右端)、1=末尾(左端)
-  // left位置: (1-r)*100% → ratio=0→100%(右端)、ratio=1→0%(左端)
   const pctLeft = r => (1 - r) * 100;
 
   function ratioFromClientX(clientX) {
@@ -118,18 +117,29 @@ function Seekbar({ ratio, bookmarks, onSeek }) {
     return Math.min(1, Math.max(0, 1 - (clientX - rect.left) / rect.width));
   }
 
-  function onMouseDown(e) { e.preventDefault(); dragging.current=true; onSeek(ratioFromClientX(e.clientX)); }
-  function onMouseMove(e) { if(dragging.current) onSeek(ratioFromClientX(e.clientX)); }
-  function onMouseUp()    { dragging.current=false; }
+  // マウス：移動があったときだけseek（タップは無視）
+  function onMouseDown(e) { e.preventDefault(); drag.current={ startX:e.clientX, moved:false }; }
+  function onMouseMove(e) {
+    const d=drag.current; if(!d) return;
+    if(!d.moved && Math.abs(e.clientX-d.startX)>4) d.moved=true;
+    if(d.moved) onSeek(ratioFromClientX(e.clientX));
+  }
+  function onMouseUp() { drag.current=null; }
   useEffect(()=>{
     window.addEventListener("mousemove",onMouseMove);
     window.addEventListener("mouseup",onMouseUp);
     return()=>{window.removeEventListener("mousemove",onMouseMove);window.removeEventListener("mouseup",onMouseUp);};
   });
 
-  function onTouchStart(e) { e.stopPropagation(); dragging.current=true; onSeek(ratioFromClientX(e.touches[0].clientX)); }
-  function onTouchMove(e)  { e.stopPropagation(); if(dragging.current) onSeek(ratioFromClientX(e.touches[0].clientX)); }
-  function onTouchEnd()    { dragging.current=false; }
+  // タッチ：移動があったときだけseek（タップは無視）
+  function onTouchStart(e) { e.stopPropagation(); drag.current={ startX:e.touches[0].clientX, moved:false }; }
+  function onTouchMove(e)  {
+    e.stopPropagation();
+    const d=drag.current; if(!d) return;
+    if(!d.moved && Math.abs(e.touches[0].clientX-d.startX)>4) d.moved=true;
+    if(d.moved) onSeek(ratioFromClientX(e.touches[0].clientX));
+  }
+  function onTouchEnd() { drag.current=null; }
 
   return (
     <div
@@ -139,20 +149,36 @@ function Seekbar({ ratio, bookmarks, onSeek }) {
       style={{height:20,display:"flex",alignItems:"center",cursor:"pointer",userSelect:"none"}}
     >
       <div style={{position:"relative",width:"100%",height:5,background:"rgba(160,130,90,0.18)",borderRadius:2}}>
+        {/* 既読バー */}
         <div style={{
           position:"absolute",right:0,top:0,bottom:0,
           width:`${ratio*100}%`,
           background:"rgba(90,60,20,0.22)",borderRadius:2,
         }}/>
+        {/* 「読んでいた場所」マーカー（タップでジャンプ） */}
+        {lastReadRatio!=null&&(
+          <div onClick={e=>{e.stopPropagation();onReturn&&onReturn();}}
+            style={{
+              position:"absolute",left:`${pctLeft(lastReadRatio)}%`,top:"50%",
+              transform:"translate(-50%,-50%) rotate(45deg)",
+              width:9,height:9,
+              background:"rgba(100,100,110,0.55)",border:"1.5px solid rgba(255,255,255,0.75)",
+              zIndex:2,cursor:"pointer",pointerEvents:"all",
+            }}/>
+        )}
+        {/* 栞マーカー（タップでジャンプ） */}
         {bookmarks.map((bm,i)=>(
-          <div key={i} style={{
-            position:"absolute",left:`${pctLeft(bm.ratio)}%`,top:"50%",
-            transform:"translate(-50%,-50%)",
-            width:11,height:11,borderRadius:"50%",
-            background:BM_COLORS[i],border:"1.5px solid rgba(255,255,255,0.75)",
-            zIndex:2,pointerEvents:"none",
-          }}/>
+          <div key={i}
+            onClick={e=>{e.stopPropagation();onJumpBm&&onJumpBm(bm);}}
+            style={{
+              position:"absolute",left:`${pctLeft(bm.ratio)}%`,top:"50%",
+              transform:"translate(-50%,-50%)",
+              width:11,height:11,borderRadius:"50%",
+              background:BM_COLORS[i],border:"1.5px solid rgba(255,255,255,0.75)",
+              zIndex:2,cursor:"pointer",pointerEvents:"all",
+            }}/>
         ))}
+        {/* 現在位置サム */}
         <div style={{
           position:"absolute",left:`${pctLeft(ratio)}%`,top:"50%",
           transform:"translate(-50%,-50%)",
@@ -458,7 +484,8 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
             {progress}%
           </div>
           <div style={{flex:1,pointerEvents:"all"}}>
-            <Seekbar ratio={progress/100} bookmarks={bookmarks} onSeek={scrollToRatio}/>
+            <Seekbar ratio={progress/100} bookmarks={bookmarks} onSeek={scrollToRatio}
+              onJumpBm={jumpBm} lastReadRatio={lastReadRatio} onReturn={returnLast}/>
           </div>
         </div>
       )}
@@ -529,7 +556,8 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
             </div>
             <div>
               <div style={{fontSize:10,color:"#9a8060",marginBottom:4,letterSpacing:"0.1em"}}>{progress}% 読了</div>
-              <Seekbar ratio={progress/100} bookmarks={bookmarks} onSeek={scrollToRatio}/>
+              <Seekbar ratio={progress/100} bookmarks={bookmarks} onSeek={scrollToRatio}
+                onJumpBm={jumpBm} lastReadRatio={lastReadRatio} onReturn={returnLast}/>
               <div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontSize:8,color:"rgba(80,50,20,0.35)"}}>
                 <span>末尾</span>
                 {[...bookmarks].sort((a,b)=>b.ratio-a.ratio).map((bm,i)=>{
