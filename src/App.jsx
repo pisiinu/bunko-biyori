@@ -247,75 +247,6 @@ function saveBookProgress(bookId, data) {
   } catch {}
 }
 
-/* ─── 左端 縦シークバー（常時表示）─── */
-function LeftProgressPanel({ progress, bookmarks, onSeek, onJumpBm }) {
-  const trackRef = useRef(null);
-  const dragging = useRef(false);
-  const ratio = progress / 100;
-
-  function ratioFromClientY(clientY) {
-    if(!trackRef.current) return ratio;
-    const rect = trackRef.current.getBoundingClientRect();
-    return Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
-  }
-
-  function onMouseDown(e) { e.preventDefault(); dragging.current=true; onSeek(ratioFromClientY(e.clientY)); }
-  function onMouseMove(e) { if(dragging.current) onSeek(ratioFromClientY(e.clientY)); }
-  function onMouseUp()    { dragging.current=false; }
-  useEffect(()=>{
-    window.addEventListener("mousemove",onMouseMove);
-    window.addEventListener("mouseup",onMouseUp);
-    return()=>{window.removeEventListener("mousemove",onMouseMove);window.removeEventListener("mouseup",onMouseUp);};
-  });
-
-  function onTouchStart(e){ e.stopPropagation(); dragging.current=true; onSeek(ratioFromClientY(e.touches[0].clientY)); }
-  function onTouchMove(e) { e.stopPropagation(); if(dragging.current) onSeek(ratioFromClientY(e.touches[0].clientY)); }
-  function onTouchEnd()   { dragging.current=false; }
-
-  return (
-    <div style={{
-      position:"absolute",left:0,top:0,bottom:0,
-      width:28,zIndex:6,
-      display:"flex",flexDirection:"column",alignItems:"center",
-      padding:"48px 0 20px",boxSizing:"border-box",
-      pointerEvents:"none",
-    }}>
-      {/* 縦トラック */}
-      <div
-        ref={trackRef}
-        onMouseDown={onMouseDown}
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-        onClick={e=>e.stopPropagation()}
-        style={{flex:1,width:4,background:"rgba(160,130,90,0.15)",borderRadius:2,position:"relative",cursor:"pointer",pointerEvents:"all"}}
-      >
-        {/* 既読バー（上から伸びる） */}
-        <div style={{position:"absolute",top:0,left:0,right:0,height:`${progress}%`,background:"rgba(90,60,20,0.28)",borderRadius:2}}/>
-        {/* 栞マーカー */}
-        {bookmarks.map((bm,i)=>(
-          <div key={i}
-            onClick={e=>{e.stopPropagation();onJumpBm(bm.ratio);}}
-            style={{
-              position:"absolute",top:`${bm.ratio*100}%`,left:"50%",
-              transform:"translate(-50%,-50%)",
-              width:10,height:10,borderRadius:"50%",
-              background:BM_COLORS[i],border:"1.5px solid rgba(255,255,255,0.75)",
-              zIndex:2,cursor:"pointer",pointerEvents:"all",
-            }}/>
-        ))}
-        {/* サム */}
-        <div style={{
-          position:"absolute",top:`${progress}%`,left:"50%",
-          transform:"translate(-50%,-50%)",
-          width:12,height:12,borderRadius:"50%",
-          background:"#3a2010",boxShadow:"0 1px 4px rgba(0,0,0,0.32)",
-          zIndex:3,pointerEvents:"none",
-        }}/>
-      </div>
-      {/* ％ラベル */}
-      <div style={{fontSize:12,color:"rgba(90,60,20,0.48)",marginTop:8,letterSpacing:"0.04em"}}>{progress}%</div>
-    </div>
-  );
-}
 
 /* ─── リーダー ─── */
 function PageReader({ book, onClose, fontSize, setFontSize }) {
@@ -373,7 +304,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
     </div>
   );
 
-  const FS=[16,19,22];
+  const FS=[13,16,19,22];
 
   // スクロール位置→進捗率を更新
   function onScroll(){
@@ -437,7 +368,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
           setOverlay(v=>!v);
         }}
         style={{
-          position:"absolute",inset:0,
+          position:"absolute",top:0,left:0,right:0,bottom:36,
           overflowX:"scroll",overflowY:"hidden",
           writingMode:"vertical-rl",textOrientation:"mixed",
           opacity:overlay?0.16:1,transition:"opacity 0.22s",
@@ -447,7 +378,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
         <div
           style={{
             minHeight:"100%",
-            padding:"40px 20px 40px 32px",
+            padding:"40px 20px",
             boxSizing:"border-box",
             fontSize,lineHeight:1.8,letterSpacing:"0.06em",
             color:"#140800",
@@ -456,14 +387,21 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
         />
       </div>
 
-      {/* 左端 縦シークバー＋進捗（常時表示）*/}
+      {/* 下端 横シークバー＋進捗（常時表示）*/}
       {!overlay&&(
-        <LeftProgressPanel
-          progress={progress}
-          bookmarks={bookmarks}
-          onSeek={scrollToRatio}
-          onJumpBm={jumpBm}
-        />
+        <div style={{
+          position:"absolute",bottom:0,left:0,right:0,height:36,
+          zIndex:6,display:"flex",alignItems:"center",
+          paddingLeft:12,paddingRight:16,gap:10,
+          pointerEvents:"none",
+        }}>
+          <div style={{fontSize:13,color:"rgba(90,60,20,0.5)",minWidth:36,letterSpacing:"0.04em",pointerEvents:"none"}}>
+            {progress}%
+          </div>
+          <div style={{flex:1,pointerEvents:"all"}}>
+            <Seekbar ratio={progress/100} bookmarks={bookmarks} onSeek={scrollToRatio}/>
+          </div>
+        </div>
       )}
 
       {/* オーバーレイ */}
