@@ -278,19 +278,19 @@ function splitHtmlAtChar(html, n) {
 }
 
 /* ─── ページ分割 ─── */
-function paginateText(html, w, h, fontSize) {
-  // CSS仕様: writing-mode:vertical-rl では line-height がカラム幅を決める
-  const colW      = fontSize * 2.0;   // line-height: 2.0 × font-size
-  const usableH   = h - 104;          // padding: 64px上 + 40px下 = 104px
-  const usableW   = w - 56;           // padding: 28px × 2 = 56px
-  const charsPerCol = Math.max(1, Math.floor(usableH / fontSize));
-  // -2 バッファ（右端・左端に余裕）
-  const colsPerPage = Math.max(1, Math.floor(usableW / colW) - 2);
-  const cpp         = Math.max(1, charsPerCol * colsPerPage);
+const PADDING          = 24;   // 左右余白px
+const LINE_HEIGHT_RATIO = 1.8; // 行間
+const RUBY_EXTRA        = 12;  // ルビ用の追加幅px
+
+function paginateText(html, fontSize) {
+  const charsPerCol  = Math.max(1, Math.floor((window.innerHeight - 120) / (fontSize * LINE_HEIGHT_RATIO)));
+  const colWidth     = fontSize + RUBY_EXTRA;
+  const availableWidth = window.innerWidth - PADDING * 2;
+  const colsPerPage  = Math.max(1, Math.floor(availableWidth / colWidth));
+  const cpp          = Math.max(1, charsPerCol * colsPerPage);
   const pages = [];
   let pos = 0;
   while (pos < html.length) {
-    // ページ先頭の改行・空白をスキップ（前ページ末尾の改行が次ページ頭に現れるのを防ぐ）
     while (pos < html.length && (html[pos] === '\n' || html[pos] === '\r')) pos++;
     if (pos >= html.length) break;
     const len = splitHtmlAtChar(html.slice(pos), cpp);
@@ -316,7 +316,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   const { text, loading: textLoading, error: textError } = useBookText(book);
   const saved = loadBookProgress(book.id);
   // ローディング・エラー時はここで早期 return できないため hooks は全て上で呼ぶ
-  const initPages = ()=> paginateText(text || "", window.innerWidth, window.innerHeight, fontSize);
+  const initPages = ()=> paginateText(text || "", fontSize);
   const [pages,setPages]           = useState(initPages);
   const [page,setPage]             = useState(saved.page ?? 0);
   const [bookmarks,setBookmarks]   = useState(saved.bookmarks ?? []);
@@ -335,10 +335,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   // フォントサイズ・テキスト変更時にページを再計算
   useEffect(()=>{
     if(!text) return;
-    const vv = window.visualViewport;
-    const w  = vv ? vv.width  : (containerRef.current?.clientWidth  ?? window.innerWidth);
-    const h  = vv ? vv.height : (containerRef.current?.clientHeight ?? window.innerHeight);
-    const np = paginateText(text, w, h, fontSize);
+    const np = paginateText(text, fontSize);
     setPages(np);
     setPage(p => Math.min(p, Math.max(0, np.length - 1)));
   }, [text, fontSize]);
@@ -493,10 +490,15 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
           }}>
             {p !== null && (
               <div style={{
+                position:"absolute",
+                top:60,
+                left:PADDING,
+                width:(window.innerWidth - PADDING * 2)+"px",
+                height:(window.innerHeight - 120)+"px",
                 writingMode:"vertical-rl",textOrientation:"mixed",
-                height:"100%",width:"100%",overflow:"hidden",
-                fontSize,lineHeight:2.0,letterSpacing:"0.08em",color:"#140800",
-                whiteSpace:"pre-wrap",padding:"64px 28px 40px 28px",
+                overflow:"hidden",padding:0,
+                fontSize,lineHeight:LINE_HEIGHT_RATIO,letterSpacing:"0.06em",color:"#140800",
+                whiteSpace:"pre-wrap",
               }} dangerouslySetInnerHTML={{__html:pages[p]}}/>
             )}
           </div>
