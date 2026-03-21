@@ -431,10 +431,10 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
       <style>{`
         .bunko-scroll::-webkit-scrollbar{display:none}
         .bunko-scroll{-ms-overflow-style:none;scrollbar-width:none}
-        .rw{display:inline;position:relative}
-        .rw .rt{display:block;position:absolute;writing-mode:vertical-rl;text-orientation:mixed;font-size:0.5em;line-height:1;right:-1em;top:0;white-space:nowrap}
-        .sd{display:inline;position:relative}
-        .sd::after{content:"・";display:block;position:absolute;writing-mode:vertical-rl;font-size:0.5em;line-height:1;right:-1em;top:0}
+        ruby{-webkit-ruby-position:before;ruby-position:over}
+        rt{font-size:0.5em;line-height:1}
+        .sd{display:inline-block;position:relative}
+        .sd::after{content:"・";position:absolute;font-size:0.5em;right:-0.55em;top:0;line-height:1}
         em.white_sesame_dot,em.白ゴマ傍点,strong.WHITE_SESAME_DOT{font-style:normal;font-weight:normal;-webkit-text-emphasis:open sesame;text-emphasis:open sesame}
         em.circle_dot,em.丸傍点,em.白丸傍点,strong.CIRCLE_DOT{font-style:normal;font-weight:normal;-webkit-text-emphasis:open circle;text-emphasis:open circle}
         em.black_circle_dot,em.黒丸傍点,strong.BLACK_CIRCLE_DOT{font-style:normal;font-weight:normal;-webkit-text-emphasis:filled circle;text-emphasis:filled circle}
@@ -467,21 +467,23 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
         style={{
           position:"absolute",top:0,left:0,right:0,bottom:36,
           overflowX:"scroll",overflowY:"hidden",
-          writingMode:"vertical-rl",textOrientation:"mixed",
+          direction:"rtl",
           opacity:overlay?0.16:1,transition:"opacity 0.22s",
           cursor:"pointer",
         }}
       >
-        <div
-          style={{
-            minHeight:"100%",
-            padding:"40px 20px",
-            boxSizing:"border-box",
-            fontSize,lineHeight:1.8,letterSpacing:"0.06em",
-            color:"#140800",
-          }}
-          dangerouslySetInnerHTML={{__html: html||""}}
-        />
+        <div style={{direction:"ltr",writingMode:"vertical-rl",textOrientation:"mixed",minHeight:"100%"}}>
+          <div
+            style={{
+              minHeight:"100%",
+              padding:"40px 20px",
+              boxSizing:"border-box",
+              fontSize,lineHeight:1.8,letterSpacing:"0.06em",
+              color:"#140800",
+            }}
+            dangerouslySetInnerHTML={{__html: html||""}}
+          />
+        </div>
       </div>
 
       {/* 下端 横シークバー＋進捗（常時表示）*/}
