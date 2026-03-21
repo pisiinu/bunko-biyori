@@ -168,7 +168,7 @@ function Seekbar({ ratio, bookmarks, onSeek }) {
 /* ─── 上部栞タブ（右上にまとめ、右=冒頭寄りの栞） ─── */
 function TopBookmarkTabs({ bookmarks, lastReadRatio, onJump, onReturn }) {
   const tabs = [
-    ...bookmarks.map((bm, origIdx) => ({ kind:'bm', ratio:bm.ratio, pct:bm.pct, origIdx })),
+    ...bookmarks.map((bm, origIdx) => ({ kind:'bm', ratio:bm.ratio, pct:bm.pct, charOffset:bm.charOffset, origIdx })),
     ...(lastReadRatio!==null ? [{ kind:'return', ratio:lastReadRatio, pct:Math.round(lastReadRatio*100) }] : []),
   ].sort((a,b) => b.ratio - a.ratio); // 降順：左が末尾寄り、右が冒頭寄り
   if(tabs.length===0) return null;
@@ -195,7 +195,7 @@ function TopBookmarkTabs({ bookmarks, lastReadRatio, onJump, onReturn }) {
         const color = BM_COLORS[tab.origIdx] ?? BM_COLORS[0];
         return (
           <div key={tab.origIdx}
-            onClick={e=>{e.stopPropagation();onJump(tab.ratio);}}
+            onClick={e=>{e.stopPropagation();onJump({ratio:tab.ratio,charOffset:tab.charOffset});}}
             style={{
               width:52,height:36,background:color,
               borderRadius:"0 0 5px 5px",cursor:"pointer",pointerEvents:"all",
@@ -260,17 +260,70 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   const [amazonModal, setAmazonModal] = useState(false);
   const [copied, setCopied]           = useState(false);
 
-  const containerRef   = useRef(null);
-  const scrollRatioRef = useRef(saved.scrollRatio ?? 0);
+  const containerRef      = useRef(null);
+  const scrollRatioRef    = useRef(saved.scrollRatio ?? 0);
+  const fontAnchorRef     = useRef(null); // フォントサイズ変更時の文字位置アンカー
 
-  // HTML読み込み後にスクロール位置を復元
+  // 右端に表示中のテキスト文字オフセットを取得
+  function captureTextAnchor() {
+    const container = containerRef.current;
+    if(!container) return null;
+    const x = window.innerWidth - 20;
+    const y = window.innerHeight / 2;
+    let range = null;
+    try {
+      if(document.caretRangeFromPoint) {
+        range = document.caretRangeFromPoint(x, y);
+      } else if(document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(x, y);
+        if(pos){ range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); }
+      }
+      if(!range || !container.contains(range.startContainer)) return null;
+      const pre = document.createRange();
+      pre.selectNodeContents(container);
+      pre.setEnd(range.startContainer, range.startOffset);
+      return pre.toString().length;
+    } catch { return null; }
+  }
+
+  // 文字オフセット位置が右端に来るようスクロール
+  function scrollToCharOffset(charOffset, behavior='smooth') {
+    const container = containerRef.current;
+    if(!container) return;
+    let accumulated = 0;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let node;
+    while((node = walker.nextNode())){
+      const len = node.textContent.length;
+      if(accumulated + len > charOffset){
+        try {
+          const r = document.createRange();
+          r.setStart(node, Math.min(charOffset - accumulated, len));
+          r.collapse(true);
+          const rect = r.getBoundingClientRect();
+          // rect.right が window.innerWidth-20 に来るようスクロール
+          container.scrollBy({ left: rect.right - (window.innerWidth - 20), behavior });
+        } catch {}
+        return;
+      }
+      accumulated += len;
+    }
+  }
+
+  // HTML読み込み後 or フォントサイズ変更後にスクロール位置を復元
   useLayoutEffect(()=>{
     if(!html || !containerRef.current) return;
+    const anchor = fontAnchorRef.current;
     const raf = requestAnimationFrame(()=>{
-      const el = containerRef.current;
-      if(!el) return;
-      const max = el.scrollWidth - el.clientWidth;
-      el.scrollLeft = -(scrollRatioRef.current * max);
+      if(anchor !== null){
+        fontAnchorRef.current = null;
+        scrollToCharOffset(anchor, 'instant');
+      } else {
+        const el = containerRef.current;
+        if(!el) return;
+        const max = el.scrollWidth - el.clientWidth;
+        el.scrollLeft = -(scrollRatioRef.current * max);
+      }
     });
     return ()=> cancelAnimationFrame(raf);
   }, [html, fontSize]);
@@ -331,10 +384,16 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   function addBm(){
     if(bookmarks.length>=MAX_BM || hasBmHere) return;
     const ratio = scrollRatioRef.current;
-    setBookmarks(prev=>[...prev,{ratio, pct:Math.round(ratio*100)}].sort((a,b)=>a.ratio-b.ratio));
+    const charOffset = captureTextAnchor();
+    setBookmarks(prev=>[...prev,{ratio, pct:Math.round(ratio*100), charOffset}].sort((a,b)=>a.ratio-b.ratio));
   }
   function removeBmAt(ratio){ setBookmarks(prev=>prev.filter(b=>Math.abs(b.ratio-ratio)>0.005)); }
-  function jumpBm(ratio){ setLastReadRatio(scrollRatioRef.current); scrollToRatio(ratio); setOverlay(false); }
+  function jumpBm(bm){
+    setLastReadRatio(scrollRatioRef.current);
+    if(bm.charOffset!=null) scrollToCharOffset(bm.charOffset);
+    else scrollToRatio(bm.ratio);
+    setOverlay(false);
+  }
   function returnLast(){ if(lastReadRatio!==null){ scrollToRatio(lastReadRatio); setLastReadRatio(null); } }
 
   const PB="rgba(248,243,234,0.97)";
@@ -425,7 +484,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
               <span style={{fontSize:10,color:"#9a8060",letterSpacing:"0.1em",minWidth:58}}>文字サイズ</span>
               <div style={{display:"flex",gap:4}}>
                 {FS.map(s=>(
-                  <button key={s} onClick={()=>setFontSize(s)}
+                  <button key={s} onClick={()=>{ fontAnchorRef.current=captureTextAnchor(); setFontSize(s); }}
                     style={{width:38,height:34,background:fontSize===s?"#2a1800":"transparent",
                       color:fontSize===s?"#f7f2e8":"#5a4030",border:`1px solid #c0a880`,cursor:"pointer",
                       fontSize:s*0.68,fontFamily:"'Noto Serif JP','Yu Mincho',serif",transition:"all 0.12s"}}>あ</button>
@@ -444,7 +503,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14,flexWrap:"wrap"}}>
               <span style={{fontSize:10,color:"#9a8060",letterSpacing:"0.1em",minWidth:58}}>栞</span>
               {bookmarks.map((bm,i)=>(
-                <button key={i} onClick={()=>jumpBm(bm.ratio)}
+                <button key={i} onClick={()=>jumpBm(bm)}
                   style={{background:BM_COLORS[i],color:"#f7f2e8",border:"none",padding:"5px 11px",cursor:"pointer",fontSize:10,letterSpacing:"0.06em",borderRadius:2}}>
                   {i+1}: {bm.pct}%
                 </button>
