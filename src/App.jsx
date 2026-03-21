@@ -290,6 +290,9 @@ function paginateText(html, w, h, fontSize) {
   const pages = [];
   let pos = 0;
   while (pos < html.length) {
+    // ページ先頭の改行・空白をスキップ（前ページ末尾の改行が次ページ頭に現れるのを防ぐ）
+    while (pos < html.length && (html[pos] === '\n' || html[pos] === '\r')) pos++;
+    if (pos >= html.length) break;
     const len = splitHtmlAtChar(html.slice(pos), cpp);
     if (len === 0) break;
     pages.push(html.slice(pos, pos + len));

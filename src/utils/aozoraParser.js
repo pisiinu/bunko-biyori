@@ -22,20 +22,29 @@ function resolveGaiji(alt) {
   return GAIJI_TABLE[key] ?? '※';
 }
 
-/** 青空文庫 HTML（ShiftJIS バッファ）を処理して HTML フラグメントを返す */
+/**
+ * 青空文庫 HTML（ShiftJIS バッファ）を処理して HTML フラグメントを返す。
+ * <div class="main_text"> の内容だけを抽出し、タイトル・著者ヘッダーを除外する。
+ */
 export function processAozoraHtml(arrayBuffer) {
   let html = new TextDecoder('shift_jis').decode(arrayBuffer);
 
-  // 0. main_text div を先に抽出してタイトル・著者ヘッダーを除外
-  const mainMatch = html.match(/<div[^>]+class=["']?main_text["']?[^>]*>([\s\S]*?)<\/div>/i);
-  if (mainMatch) {
-    html = mainMatch[1];
+  // ── 1. main_text 領域を抽出 ──────────────────────────────────
+  // class="main_text" の開始タグ末尾から、class="bibliography" または </body> までを切り出す
+  const mainOpen = html.search(/<div[^>]+class=["']?main_text["']?/i);
+  if (mainOpen !== -1) {
+    const tagEnd   = html.indexOf('>', mainOpen) + 1;
+    const bibStart = html.search(/<div[^>]+class=["']?bibliography["']?/i);
+    const bodyEnd  = html.search(/<\/body>/i);
+    const sliceEnd = bibStart > tagEnd ? bibStart : (bodyEnd > tagEnd ? bodyEnd : html.length);
+    html = html.slice(tagEnd, sliceEnd);
   }
+  // main_text が見つからない場合はドキュメント全体を処理（後段のフォールバックで本文を切り出す）
 
-  // 1. 外字画像を先に変換（<rb>内にある場合があるため）
+  // ── 2. 外字画像を Unicode に変換 ─────────────────────────────
   html = html.replace(/<img[^>]*alt="([^"]*)"[^>]*/gi, (_, alt) => resolveGaiji(alt));
 
-  // 2. <ruby> タグをシンプル形式に整理（プレースホルダーで保護）
+  // ── 3. <ruby> タグをシンプル形式に整理（プレースホルダーで保護） ──
   const rubies = [];
   html = html.replace(/<ruby[^>]*>[\s\S]*?<\/ruby>/gi, (match) => {
     const rb = match.match(/<rb>([\s\S]*?)<\/rb>/i);
@@ -45,7 +54,6 @@ export function processAozoraHtml(arrayBuffer) {
       rubies.push(`<ruby>${rb[1]}<rt>${rt[1]}</rt></ruby>`);
       return `\x00R${idx}\x00`;
     }
-    // rbなし形式
     const simple = match.match(/<ruby[^>]*>([\s\S]*?)<rt>([\s\S]*?)<\/rt>[\s\S]*?<\/ruby>/i);
     if (simple) {
       const base = simple[1].replace(/<[^>]+>/g, '').trim();
@@ -56,49 +64,49 @@ export function processAozoraHtml(arrayBuffer) {
     return match.replace(/<[^>]+>/g, '');
   });
 
-  // 3. 残りの HTML タグを除去
+  // ── 4. 残りの HTML タグを除去 ────────────────────────────────
   html = html.replace(/<[^>]+>/g, '');
 
-  // 4. HTML エンティティ変換
+  // ── 5. HTML エンティティ変換 ─────────────────────────────────
   html = html
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&nbsp;/g, '\u3000');
 
-  // 5. ルビプレースホルダー復元
+  // ── 6. ルビプレースホルダー復元 ──────────────────────────────
   html = html.replace(/\x00R(\d+)\x00/g, (_, i) => rubies[parseInt(i)]);
 
-  // 6. 青空文庫注記除去（［＃...］）
+  // ── 7. 青空文庫注記除去（［＃...］） ─────────────────────────
   html = html.replace(/［＃[^］]*］/g, '');
 
-  // 7. 本文を抽出（底本情報の前まで）
+  // ── 8. 行配列に変換して本文を特定 ───────────────────────────
   const lines = html.split(/\r?\n/).map(l => l.trim());
   let start = 0;
-  let end = lines.length;
+  let end   = lines.length;
 
-  // 本文開始：区切り線（--------等）の後（main_text抽出できなかった場合のフォールバック）
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].match(/^[-—＿─＊━]{3,}$/)) {
-      start = i + 1;
-      while (start < lines.length && (lines[start].length === 0 || lines[start].match(/^[-—＿─＊━]+$/))) {
-        start++;
-      }
-      break;
-    }
-  }
-  // 区切り線が見つからない場合
-  if (start === 0) {
+  // main_text が取れていない場合のみ区切り線を探す
+  if (mainOpen === -1) {
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].length > 0 && i > 3) { start = i; break; }
+      if (lines[i].match(/^[-—＿─＊━]{3,}$/)) {
+        start = i + 1;
+        while (start < lines.length &&
+               (lines[start].length === 0 || lines[start].match(/^[-—＿─＊━]+$/))) {
+          start++;
+        }
+        break;
+      }
     }
-  }
-
-  // 本文終了：底本情報の前
-  for (let i = lines.length - 1; i > start; i--) {
-    if (lines[i].includes('底本') || lines[i].includes('入力者') || lines[i].includes('校正者')) {
-      end = i;
-      break;
+    if (start === 0) {
+      for (let i = 4; i < lines.length; i++) {
+        if (lines[i].length > 0) { start = i; break; }
+      }
+    }
+    // 底本情報の前で終了
+    for (let i = lines.length - 1; i > start; i--) {
+      if (lines[i].includes('底本') || lines[i].includes('入力者') || lines[i].includes('校正者')) {
+        end = i; break;
+      }
     }
   }
 

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { fetchAozoraText } from '../utils/aozoraParser.js';
 
-const CACHE_PREFIX = 'bunko_text_v2_';  // v2: main_text抽出対応
+const CACHE_PREFIX = 'bunko_text_v3_';  // v3: main_text正確抽出対応
 const MAX_CACHED_BOOKS = 30;
 
 // 旧バージョンのキャッシュを削除
 (()=>{
   try {
     Object.keys(localStorage)
-      .filter(k => k.startsWith('bunko_text_') && !k.startsWith('bunko_text_v2_'))
+      .filter(k => k.startsWith('bunko_text_') && !k.startsWith('bunko_text_v3_'))
       .forEach(k => localStorage.removeItem(k));
   } catch {}
 })();
