@@ -428,7 +428,13 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"linear-gradient(150deg,#f7f2e8 0%,#ece6d4 100%)",fontFamily:"'Noto Serif JP','Yu Mincho',serif",userSelect:"none"}}>
-      <style>{`.bunko-scroll::-webkit-scrollbar{display:none}.bunko-scroll{-ms-overflow-style:none;scrollbar-width:none}`}</style>
+      <style>{`
+        .bunko-scroll::-webkit-scrollbar{display:none}
+        .bunko-scroll{-ms-overflow-style:none;scrollbar-width:none}
+        ruby{line-height:100%;-webkit-ruby-position:before;ruby-position:over}
+        rt{line-height:50%;font-size:0.5em}
+        rp{display:none}
+      `}</style>
 
       {/* 上部栞タブ */}
       <TopBookmarkTabs bookmarks={bookmarks} lastReadRatio={lastReadRatio} onJump={jumpBm} onReturn={returnLast}/>
