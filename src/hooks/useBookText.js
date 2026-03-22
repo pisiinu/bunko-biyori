@@ -1,39 +1,68 @@
 import { useState, useEffect } from 'react';
 import { fetchAozoraHtml } from '../utils/aozoraParser.js';
 
-const CACHE_PREFIX    = 'bunko_html_v33_'; // HTML形式キャッシュ（v27: .ra=ゼロ幅inline-blockアンカーでベース文字レンダリングを保持しつつ含有ブロックを確保）
-const MAX_CACHED_BOOKS = 30;
-
-// 旧バージョンのキャッシュをすべて削除
+// 旧 localStorage キャッシュを一括削除（v33まで）
 (()=>{
   try {
+    const prefixes = ['bunko_text_',...Array.from({length:33},(_,i)=>`bunko_html_v${i+1}_`)];
     Object.keys(localStorage)
-      .filter(k => ['bunko_text_','bunko_html_v1_','bunko_html_v2_','bunko_html_v3_','bunko_html_v4_','bunko_html_v5_','bunko_html_v6_','bunko_html_v7_','bunko_html_v8_','bunko_html_v9_','bunko_html_v10_','bunko_html_v11_','bunko_html_v12_','bunko_html_v13_','bunko_html_v14_','bunko_html_v15_','bunko_html_v16_','bunko_html_v17_','bunko_html_v18_','bunko_html_v19_','bunko_html_v20_','bunko_html_v21_','bunko_html_v22_','bunko_html_v23_','bunko_html_v24_','bunko_html_v25_','bunko_html_v26_','bunko_html_v27_','bunko_html_v28_','bunko_html_v29_','bunko_html_v30_','bunko_html_v31_','bunko_html_v32_'].some(p => k.startsWith(p)))
+      .filter(k => prefixes.some(p => k.startsWith(p)))
       .forEach(k => localStorage.removeItem(k));
   } catch {}
 })();
 
-function readCache(bookId) {
+// ─── IndexedDB キャッシュ ───
+const DB_NAME = 'bunko';
+const DB_VER  = 1;
+const STORE   = 'html';
+const MAX_CACHED_BOOKS = 30;
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE))
+        db.createObjectStore(STORE, { keyPath: 'bookId' });
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function readCache(bookId) {
   try {
-    const raw = localStorage.getItem(CACHE_PREFIX + bookId);
-    return raw ? JSON.parse(raw) : null;
+    const db = await openDb();
+    return new Promise(resolve => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(bookId);
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror   = () => resolve(null);
+    });
   } catch { return null; }
 }
 
-function writeCache(bookId, html) {
+async function writeCache(bookId, html) {
   try {
-    const keys = Object.keys(localStorage).filter(k => k.startsWith(CACHE_PREFIX));
-    if (keys.length >= MAX_CACHED_BOOKS) {
-      let oldest = null, oldestTime = Infinity;
-      keys.forEach(k => {
-        try {
-          const { savedAt } = JSON.parse(localStorage.getItem(k));
-          if (savedAt < oldestTime) { oldestTime = savedAt; oldest = k; }
-        } catch {}
+    const db = await openDb();
+    // 上限超えなら最古エントリを削除
+    const all = await new Promise(resolve => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
+      req.onsuccess = () => resolve(req.result ?? []);
+      req.onerror   = () => resolve([]);
+    });
+    if (all.length >= MAX_CACHED_BOOKS) {
+      const oldest = all.sort((a, b) => a.savedAt - b.savedAt)[0];
+      await new Promise(resolve => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).delete(oldest.bookId);
+        tx.oncomplete = resolve;
       });
-      if (oldest) localStorage.removeItem(oldest);
     }
-    localStorage.setItem(CACHE_PREFIX + bookId, JSON.stringify({ html, savedAt: Date.now() }));
+    await new Promise(resolve => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put({ bookId, html, savedAt: Date.now() });
+      tx.oncomplete = resolve;
+    });
   } catch {}
 }
 
@@ -42,10 +71,11 @@ function writeCache(bookId, html) {
  * 既にキャッシュ済みの場合は何もしない
  */
 export async function precacheBook(bookId, url) {
-  if (readCache(bookId)) return;
+  const cached = await readCache(bookId);
+  if (cached) return;
   try {
     const html = await fetchAozoraHtml(url);
-    writeCache(bookId, html);
+    await writeCache(bookId, html);
   } catch {}
 }
 
@@ -58,25 +88,27 @@ export function useBookText(book) {
 
   useEffect(() => {
     if (!book) { setState({ html: null, loading: false, error: null }); return; }
-
-    const cached = readCache(book.id);
-    if (cached) { setState({ html: cached.html, loading: false, error: null }); return; }
-
     if (!book.url) { setState({ html: null, loading: false, error: 'no_url' }); return; }
 
-    setState({ html: null, loading: true, error: null });
     let cancelled = false;
 
-    fetchAozoraHtml(book.url)
-      .then(html => {
+    (async () => {
+      // キャッシュ確認（IDB は非同期だが通常 < 10ms）
+      const cached = await readCache(book.id);
+      if (cancelled) return;
+      if (cached) { setState({ html: cached.html, loading: false, error: null }); return; }
+
+      // キャッシュなし → ネット取得
+      setState({ html: null, loading: true, error: null });
+      try {
+        const html = await fetchAozoraHtml(book.url);
         if (cancelled) return;
-        writeCache(book.id, html);
+        await writeCache(book.id, html);
         setState({ html, loading: false, error: null });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setState({ html: null, loading: false, error: 'network' });
-      });
+      } catch {
+        if (!cancelled) setState({ html: null, loading: false, error: 'network' });
+      }
+    })();
 
     return () => { cancelled = true; };
   }, [book?.id, book?.url]);
