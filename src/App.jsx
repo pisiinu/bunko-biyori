@@ -321,6 +321,10 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   function scrollToCharOffset(charOffset, behavior='smooth') {
     const container = containerRef.current;
     if(!container) return;
+    // Step1: ratioベースで大まかに位置合わせ（iOS SafariはスクロールエリアexのgetBoundingClientRectが0を返すため、先に文字を画面近くに持ってくる）
+    const max = container.scrollWidth - container.clientWidth;
+    if(max > 0) container.scrollLeft = -(scrollRatioRef.current * max);
+    // Step2: 文字を正確に右端に合わせる
     let accumulated = 0;
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
     let node;
@@ -331,9 +335,9 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
           const charIdx = charOffset - accumulated;
           const r = document.createRange();
           r.setStart(node, charIdx);
-          r.setEnd(node, Math.min(charIdx + 1, len)); // 1文字スパン（collapsed rangeは縦書きでrectが0になる場合がある）
+          r.setEnd(node, Math.min(charIdx + 1, len)); // 1文字スパン
           const rect = r.getBoundingClientRect();
-          if(rect.width === 0 && rect.height === 0) return; // デgenerate rect: スキップ
+          if(rect.width === 0 && rect.height === 0) return;
           // rect.right が window.innerWidth-20 に来るようスクロール
           container.scrollBy({ left: rect.right - (window.innerWidth - 20), behavior });
         } catch {}
@@ -475,7 +479,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
           setOverlay(v=>!v);
         }}
         style={{
-          position:"absolute",top:0,left:0,right:0,bottom:IS_STANDALONE?104:52,
+          position:"absolute",top:0,left:0,right:0,bottom:IS_STANDALONE?104:40,
           overflowX:"scroll",overflowY:"hidden",
           direction:"rtl",
           opacity:overlay?0.16:1,transition:"opacity 0.22s",
@@ -499,7 +503,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
       {/* 下端 横シークバー＋進捗（常時表示）*/}
       {!overlay&&(
         <div style={{
-          position:"absolute",bottom:IS_STANDALONE?34:16,left:0,right:0,height:36,
+          position:"absolute",bottom:IS_STANDALONE?34:4,left:0,right:0,height:36,
           zIndex:6,display:"flex",alignItems:"center",
           paddingLeft:12,paddingRight:16,gap:10,
           pointerEvents:"none",
