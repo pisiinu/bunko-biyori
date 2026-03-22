@@ -87,12 +87,25 @@ export function processAozoraHtml(arrayBuffer) {
   return html;
 }
 
-/** Vercel API 経由で青空文庫 XHTML を取得・処理 */
+/** Vercel API 経由で青空文庫 XHTML を取得・処理（Web Worker で実行しメインスレッドをブロックしない） */
 export async function fetchAozoraHtml(url) {
   const rawUrl = toRawUrl(url);
   const proxyUrl = `/api/aozora?url=${encodeURIComponent(rawUrl)}`;
   const resp = await fetch(proxyUrl);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const buf = await resp.arrayBuffer();
-  return processAozoraHtml(buf);
+
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(
+      new URL('../workers/aozora.worker.js', import.meta.url),
+      { type: 'module' }
+    );
+    worker.onmessage = (e) => {
+      worker.terminate();
+      if (e.data.error) reject(new Error(e.data.error));
+      else resolve(e.data.html);
+    };
+    worker.onerror = () => { worker.terminate(); reject(new Error('worker error')); };
+    worker.postMessage({ buffer: buf }, [buf]); // ArrayBuffer を転送（ゼロコピー）
+  });
 }

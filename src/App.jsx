@@ -278,8 +278,8 @@ function saveBookProgress(bookId, data) {
 
 
 /* ─── HTML を <br> 区切りで分割（長編のレイジーレンダリング用） ─── */
-const CHUNK_SIZE  = 50000; // chars
-const INIT_CHUNKS = 3;     // 初回描画チャンク数
+const CHUNK_SIZE  = 15000; // chars（長編でもiOS Safariが固まらない単位）
+const INIT_CHUNKS = 2;     // 初回描画チャンク数
 
 function splitChunks(html) {
   const chunks = [];
