@@ -627,21 +627,32 @@ function WantBtn({ id, wantList, toggle }) {
 const TABS = ['shelf','search','wantlist'];
 
 /* ─── データ ─── */
+// 青空文庫 2022年アクセスランキング準拠（上位作品順）
 const POPULAR = [
-  {id:"k773",   title:"こころ",         author:"夏目漱石",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000148/files/773_14560.html"},
-  {id:"k752",   title:"坊っちゃん",     author:"夏目漱石",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000148/files/752_14964.html"},
-  {id:"k128",   title:"羅生門",         author:"芥川龍之介", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000879/files/128_15261.html"},
-  {id:"k1567",  title:"走れメロス",     author:"太宰治",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000035/files/1567_14913.html"},
-  {id:"k46322", title:"銀河鉄道の夜",   author:"宮沢賢治",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000081/files/46322_24347.html"},
-  {id:"k623",   title:"山月記",         author:"中島敦",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000119/files/623_18353.html"},
-  {id:"k301",   title:"人間失格",       author:"太宰治",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000035/files/301_14912.html"},
-  {id:"k538",   title:"舞姫",           author:"森鴎外",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000129/files/682_15414.html"},
-  {id:"k56041", title:"たけくらべ",     author:"樋口一葉",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000064/files/56041_54765.html"},
-  {id:"k46349", title:"檸檬",           author:"梶井基次郎", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000074/files/46349_23843.html"},
-  {id:"k789",   title:"吾輩は猫である", author:"夏目漱石",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000148/files/789_14547.html"},
-  {id:"k92",    title:"蜘蛛の糸",       author:"芥川龍之介", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000879/files/92_14545.html"},
-  {id:"k179",   title:"藪の中",         author:"芥川龍之介", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000879/files/179_15255.html"},
-  {id:"k691",   title:"高瀬舟",         author:"森鴎外",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000129/files/691_15352.html"},
+  {id:"k773",   title:"こころ",             author:"夏目漱石",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000148/files/773_14560.html"},
+  {id:"k301",   title:"人間失格",           author:"太宰治",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000035/files/301_14912.html"},
+  {id:"k789",   title:"吾輩は猫である",     author:"夏目漱石",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000148/files/789_14547.html"},
+  {id:"k128",   title:"羅生門",             author:"芥川龍之介", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000879/files/128_15261.html"},
+  {id:"k46322", title:"銀河鉄道の夜",       author:"宮沢賢治",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000081/files/46322_24347.html"},
+  {id:"k1567",  title:"走れメロス",         author:"太宰治",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000035/files/1567_14913.html"},
+  {id:"k752",   title:"坊っちゃん",         author:"夏目漱石",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000148/files/752_14964.html"},
+  {id:"k92",    title:"蜘蛛の糸",           author:"芥川龍之介", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000879/files/92_14545.html"},
+  {id:"k1565",  title:"斜陽",               author:"太宰治",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000035/files/1565_8559.html"},
+  {id:"k46349", title:"檸檬",               author:"梶井基次郎", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000074/files/46349_23843.html"},
+  {id:"k56648", title:"人間椅子",           author:"江戸川乱歩", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/001779/files/56648_58207.html"},
+  {id:"k45630", title:"〔雨ニモマケズ〕",   author:"宮沢賢治",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000081/files/45630_23908.html"},
+  {id:"k43754", title:"注文の多い料理店",   author:"宮沢賢治",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000081/files/43754_17659.html"},
+  {id:"k799",   title:"夢十夜",             author:"夏目漱石",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000148/files/799_14972.html"},
+  {id:"k623",   title:"山月記",             author:"中島敦",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000119/files/623_18353.html"},
+  {id:"k1465",  title:"蟹工船",             author:"小林多喜二", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000156/files/1465_16805.html"},
+  {id:"k776",   title:"草枕",               author:"夏目漱石",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000148/files/776_14941.html"},
+  {id:"k275",   title:"女生徒",             author:"太宰治",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000035/files/275_13903.html"},
+  {id:"k42",    title:"鼻",                 author:"芥川龍之介", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000879/files/42_15228.html"},
+  {id:"k42620", title:"堕落論",             author:"坂口安吾",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/001095/files/42620_21407.html"},
+  {id:"k538",   title:"舞姫",               author:"森鴎外",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000129/files/682_15414.html"},
+  {id:"k691",   title:"高瀬舟",             author:"森鴎外",     url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000129/files/691_15352.html"},
+  {id:"k179",   title:"藪の中",             author:"芥川龍之介", url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000879/files/179_15255.html"},
+  {id:"k56041", title:"たけくらべ",         author:"樋口一葉",   url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000064/files/56041_54765.html"},
 ];
 
 export default function App() {
@@ -655,7 +666,7 @@ export default function App() {
 
   const [fontSize,setFontSize] = useState(16);
   const [tab,setTab]           = useState("shelf");
-  const [shelf,setShelf]       = useState([POPULAR[0],POPULAR[2],POPULAR[3]]);
+  const [shelf,setShelf]       = useState([POPULAR[0],POPULAR[1],POPULAR[3]]);
   const [wantList,setWantList] = useState([]);
   const [reading,setReading]   = useState(null);
   const [query,setQuery]       = useState("");
