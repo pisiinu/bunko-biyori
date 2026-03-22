@@ -725,11 +725,13 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
             ref={contentRef}
             style={{
               height:"100%",
-              padding:"56px 20px 20px",
+              // block方向(物理左右)はpaddingを0にする
+              // → lineHeight×fontSize×linesPerPage = containerWidth が成立し、
+              //   ページ境界と行間が一致して文字の泣き別れが起きない
+              paddingTop:"56px", paddingBottom:"20px",
+              paddingLeft:0, paddingRight:0,
               boxSizing:"border-box",
               fontSize,
-              // 端末幅が lineHeight×fontSize の整数倍になるよう動的計算
-              // → ページ境界が常に行間に来て文字・ルビの泣き別れを防ぐ
               lineHeight,
               letterSpacing:"0.06em",
               color:"#140800",
