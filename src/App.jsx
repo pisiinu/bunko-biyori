@@ -392,6 +392,8 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
     const ratio = max > 0 ? Math.min(1, Math.max(0, -el.scrollLeft / max)) : 0;
     scrollRatioRef.current = ratio;
     setProgress(Math.round(ratio * 100));
+    // 読んでいた場所を過ぎたらマーカーを消す
+    setLastReadRatio(prev => (prev !== null && ratio >= prev) ? null : prev);
   }
 
   // 指定割合へスクロール
