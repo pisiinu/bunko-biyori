@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react"; // useLayoutEffect: scroll restore
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react"; // useLayoutEffect: scroll restore
 import { useBookText } from "./hooks/useBookText.js";
 import { useCatalog, searchCatalog } from "./hooks/useCatalog.js";
 
@@ -626,8 +626,17 @@ function WantBtn({ id, wantList, toggle }) {
 /* ─── タブ定義 ─── */
 const TABS = ['shelf','search','wantlist'];
 
+/* ─── 文字遣い優先度（新字新仮名が最良） ─── */
+function variantPriority(v) {
+  if (v === '新字新仮名') return 0;
+  if (v === '新字旧仮名') return 1;
+  if (v === '旧字旧仮名') return 2;
+  if (v === '旧字新仮名') return 3;
+  return 4;
+}
+
 /* ─── データ ─── */
-// 青空文庫 2022年アクセスランキング準拠（上位50位・重複除去で47作品）
+// 青空文庫 2022年アクセスランキング準拠（上位50位・重複除去で47作品）。ランキング表示は上位30。
 const POPULAR = [
   {id:"k773",   title:"こころ",                 author:"夏目漱石",         url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000148/files/773_14560.html"},
   {id:"k301",   title:"人間失格",               author:"太宰治",           url:"https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/cards/000035/files/301_14912.html"},
@@ -701,6 +710,17 @@ export default function App() {
   const [sortOrder,setSortOrder]       = useState('default');
   const [pendingBookId,setPendingBookId] = useState(null);
   const { catalog, loading: catLoading } = useCatalog(catEnabled);
+
+  // ランキング表示用：上位30作品。カタログ読み込み済みなら新字新仮名優先でURLを解決
+  const rankingBooks = useMemo(() => {
+    return POPULAR.slice(0, 30).map(book => {
+      if (!catalog) return book;
+      const matches = catalog.filter(w => w.title === book.title && w.author === book.author);
+      if (!matches.length) return book;
+      const best = [...matches].sort((a, b) => variantPriority(a.variant) - variantPriority(b.variant))[0];
+      return best.url !== book.url ? { ...book, url: best.url } : book;
+    });
+  }, [catalog]);
 
   // ─── ハッシュルーティング ───
   // 本を開いたらURLハッシュを更新
@@ -905,7 +925,7 @@ export default function App() {
               <>
                 <div style={{fontSize:13,letterSpacing:"0.28em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:6,marginBottom:16}}>人気ランキング</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-                  {POPULAR.map((book,i)=>{
+                  {rankingBooks.map((book,i)=>{
                     const saved=!!shelf.find(b=>b.id===book.id);
                     const full=shelf.length>=MAX_SHELF;
                     const isL=loading===book.id;
@@ -943,8 +963,11 @@ export default function App() {
                       const pi=b=>POPULAR.findIndex(p=>p.title===b.title&&p.author===b.author);
                       const ia=pi(a), ib=pi(b);
                       if(ia>=0&&ib<0) return -1; if(ia<0&&ib>=0) return 1;
-                      if(ia>=0&&ib>=0) return ia-ib;
-                      return 0;
+                      if(ia>=0&&ib>=0){
+                        if(ia!==ib) return ia-ib;
+                        return variantPriority(a.variant)-variantPriority(b.variant);
+                      }
+                      return variantPriority(a.variant)-variantPriority(b.variant);
                     }
                     return 0;
                   });
