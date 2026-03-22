@@ -294,7 +294,9 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   function captureTextAnchor() {
     const container = containerRef.current;
     if(!container) return null;
-    const x = window.innerWidth - 20;
+    // 列幅の中心を狙う（右パディング端ではなく、最右列の中央）
+    const colWidth = fontSize * 1.8;
+    const x = window.innerWidth - 20 - colWidth * 0.5;
     const y = window.innerHeight / 2;
     let range = null;
     try {
@@ -323,10 +325,12 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
       const len = node.textContent.length;
       if(accumulated + len > charOffset){
         try {
+          const charIdx = charOffset - accumulated;
           const r = document.createRange();
-          r.setStart(node, Math.min(charOffset - accumulated, len));
-          r.collapse(true);
+          r.setStart(node, charIdx);
+          r.setEnd(node, Math.min(charIdx + 1, len)); // 1文字スパン（collapsed rangeは縦書きでrectが0になる場合がある）
           const rect = r.getBoundingClientRect();
+          if(rect.width === 0 && rect.height === 0) return; // デgenerate rect: スキップ
           // rect.right が window.innerWidth-20 に来るようスクロール
           container.scrollBy({ left: rect.right - (window.innerWidth - 20), behavior });
         } catch {}
