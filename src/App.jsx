@@ -242,7 +242,7 @@ function TopBookmarkTabs({ bookmarks, lastReadRatio, onJump, onReturn }) {
 
 /* ─── Amazonダイアログ ─── */
 function AmazonModal({ book, onClose }) {
-  const url = `https://www.amazon.co.jp/s?k=${encodeURIComponent(book.author+" "+book.title)}`;
+  const url = `https://www.amazon.co.jp/s?k=${encodeURIComponent(book.author+" "+book.title)}&tag=hana0f-22`;
   return (
     <div onClick={onClose}
       style={{position:"fixed",inset:0,zIndex:300,background:"rgba(20,10,0,0.48)",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -535,7 +535,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
               <div style={{fontSize:11,color:"#7a6040",letterSpacing:"0.04em",marginTop:2}}>{book.author}</div>
             </div>
             <button onClick={()=>setAmazonModal(true)}
-              style={{background:"none",border:`1px solid #c0a880`,cursor:"pointer",padding:"7px 14px",color:"#5a4030",fontSize:12,letterSpacing:"0.08em",whiteSpace:"nowrap"}}>紙の本を探す</button>
+              style={{background:"none",border:`1.5px solid #a08050`,cursor:"pointer",padding:"9px 18px",color:"#3a2010",fontSize:13,letterSpacing:"0.08em",whiteSpace:"nowrap",fontWeight:600}}>紙の本を探す</button>
           </div>
           <div style={{flex:1}}/>
           <div onClick={e=>e.stopPropagation()}
