@@ -277,6 +277,25 @@ function saveBookProgress(bookId, data) {
 }
 
 
+/* ─── HTML を <br> 区切りで分割（長編のレイジーレンダリング用） ─── */
+const CHUNK_SIZE  = 50000; // chars
+const INIT_CHUNKS = 3;     // 初回描画チャンク数
+
+function splitChunks(html) {
+  const chunks = [];
+  let start = 0;
+  while (start < html.length) {
+    const end0 = start + CHUNK_SIZE;
+    if (end0 >= html.length) { chunks.push(html.slice(start)); break; }
+    // CHUNK_SIZE 以降の最初の <br> で区切る（タグの途中を避ける）
+    const br = html.indexOf('<br>', end0);
+    const end = (br !== -1 && br < end0 + 20000) ? br + 4 : end0;
+    chunks.push(html.slice(start, end));
+    start = end;
+  }
+  return chunks;
+}
+
 /* ─── リーダー ─── */
 function PageReader({ book, onClose, fontSize, setFontSize }) {
   const { html, loading: textLoading, error: textError } = useBookText(book);
@@ -290,8 +309,11 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
   const [copied, setCopied]           = useState(false);
 
   const containerRef      = useRef(null);
+  const contentRef        = useRef(null); // 本文 div（直接 DOM 操作）
   const scrollRatioRef    = useRef(saved.scrollRatio ?? 0);
   const fontAnchorRef     = useRef(null); // フォントサイズ変更時の文字位置アンカー
+  const chunksRef         = useRef([]);   // 全チャンク
+  const renderedCountRef  = useRef(0);    // 描画済みチャンク数
 
   // 右端に表示中のテキスト文字オフセットを取得
   function captureTextAnchor() {
@@ -317,10 +339,11 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
     } catch { return null; }
   }
 
-  // 文字オフセット位置が右端に来るようスクロール
+  // 文字オフセット位置が右端に来るようスクロール（全チャンク先行展開）
   function scrollToCharOffset(charOffset, behavior='smooth') {
     const container = containerRef.current;
     if(!container) return;
+    ensureAllChunks();
     // Step1: ratioベースで大まかに位置合わせ（iOS SafariはスクロールエリアexのgetBoundingClientRectが0を返すため、先に文字を画面近くに持ってくる）
     const max = container.scrollWidth - container.clientWidth;
     if(max > 0) container.scrollLeft = -(scrollRatioRef.current * max);
@@ -347,28 +370,39 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
     }
   }
 
-  // HTML読み込み後 or フォントサイズ変更後にスクロール位置を復元
-  useLayoutEffect(()=>{
-    if(!html || !containerRef.current) return;
-    const anchor = fontAnchorRef.current;
-    const raf = requestAnimationFrame(()=>{
+  // html 読み込み後：チャンク分割 → 初回描画 → スクロール位置復元
+  useEffect(()=>{
+    if(!html || !contentRef.current) return;
+    const chunks = splitChunks(html);
+    chunksRef.current = chunks;
+    renderedCountRef.current = Math.min(INIT_CHUNKS, chunks.length);
+    contentRef.current.innerHTML = chunks.slice(0, renderedCountRef.current).join('');
+    // 次フレームでスクロール復元（レイアウト確定後）
+    requestAnimationFrame(()=>{
       const el = containerRef.current;
       if(!el) return;
       const max = el.scrollWidth - el.clientWidth;
-      if(anchor !== null){
-        fontAnchorRef.current = null;
-        // newScrollLeft = oldScrollLeft × (newScrollWidth / oldScrollWidth)
-        // コンテンツ幅の比率でスケール（ratio×maxより正確）
-        const newScrollLeft = anchor.scrollWidth > 0
-          ? anchor.scrollLeft * (el.scrollWidth / anchor.scrollWidth)
-          : -(scrollRatioRef.current * max);
-        el.scrollLeft = Math.max(-max, Math.min(0, newScrollLeft));
-      } else {
-        el.scrollLeft = -(scrollRatioRef.current * max);
-      }
+      el.scrollLeft = max > 0 ? -(scrollRatioRef.current * max) : 0;
+    });
+  }, [html]);
+
+  // フォントサイズ変更後：アンカーベースでスクロール位置を復元
+  useLayoutEffect(()=>{
+    if(!html || !containerRef.current) return;
+    const anchor = fontAnchorRef.current;
+    if(anchor === null) return; // フォント変更時のみ（初回描画時は html effect が担当）
+    const raf = requestAnimationFrame(()=>{
+      const el = containerRef.current;
+      if(!el) return;
+      fontAnchorRef.current = null;
+      const newScrollLeft = anchor.scrollWidth > 0
+        ? anchor.scrollLeft * (el.scrollWidth / anchor.scrollWidth)
+        : -(scrollRatioRef.current * (el.scrollWidth - el.clientWidth));
+      const max = el.scrollWidth - el.clientWidth;
+      el.scrollLeft = Math.max(-max, Math.min(0, newScrollLeft));
     });
     return ()=> cancelAnimationFrame(raf);
-  }, [html, fontSize]);
+  }, [fontSize]);
 
   useEffect(()=>{ saveBookProgress(book.id, { bookmarks }); }, [bookmarks]);
   useEffect(()=>{ return ()=>{ saveBookProgress(book.id, { scrollRatio: scrollRatioRef.current }); }; }, [book.id]);
@@ -401,7 +435,16 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
 
   const FS=[13,16,19,22];
 
-  // スクロール位置→進捗率を更新
+  // 全チャンクを即時描画（seekbar ジャンプ・bookmark 復元時に呼ぶ）
+  function ensureAllChunks(){
+    const chunks = chunksRef.current;
+    if(!contentRef.current || renderedCountRef.current >= chunks.length) return false;
+    contentRef.current.innerHTML = chunks.join('');
+    renderedCountRef.current = chunks.length;
+    return true;
+  }
+
+  // スクロール位置→進捗率を更新 + レイジーロード
   function onScroll(){
     const el = containerRef.current; if(!el) return;
     const max = el.scrollWidth - el.clientWidth;
@@ -410,13 +453,29 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
     setProgress(Math.round(ratio * 100));
     // 読んでいた場所を過ぎたらマーカーを消す
     setLastReadRatio(prev => (prev !== null && ratio >= prev) ? null : prev);
+    // レイジーロード：末尾 2画面幅以内に近づいたら次チャンクを追加
+    const chunks = chunksRef.current;
+    const rc = renderedCountRef.current;
+    if(rc < chunks.length && max > 0){
+      const distFromEnd = max + el.scrollLeft; // scrollLeft ≤ 0 → approaches 0 at end
+      if(distFromEnd < el.clientWidth * 2){
+        const next = Math.min(rc + 2, chunks.length);
+        for(let i = rc; i < next; i++)
+          contentRef.current?.insertAdjacentHTML('beforeend', chunks[i]);
+        renderedCountRef.current = next;
+      }
+    }
   }
 
-  // 指定割合へスクロール
+  // 指定割合へスクロール（全チャンク先行展開）
   function scrollToRatio(ratio){
     const el = containerRef.current; if(!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    el.scrollTo({ left: -(ratio * max), behavior:'smooth' });
+    const needsRender = ensureAllChunks();
+    const doScroll = ()=>{
+      const max = el.scrollWidth - el.clientWidth;
+      el.scrollTo({ left: -(ratio * max), behavior:'smooth' });
+    };
+    needsRender ? requestAnimationFrame(doScroll) : doScroll();
   }
 
   // 左端タップ→先へ（スクロール左）、右端タップ→戻る（スクロール右）
@@ -500,7 +559,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
               fontSize,lineHeight:1.8,letterSpacing:"0.06em",
               color:"#140800",
             }}
-            dangerouslySetInnerHTML={{__html: html||""}}
+            ref={contentRef}
           />
         </div>
       </div>
