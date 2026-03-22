@@ -51,15 +51,6 @@ export function processAozoraHtml(arrayBuffer) {
   html = html.replace(/<\/?rp[^>]*>/gi, '');
   // <rb> タグを除去（中身は保持）
   html = html.replace(/<\/?rb[^>]*>/gi, '');
-  // ruby を span ベース構造に変換してネイティブ ruby の列幅拡張を回避
-  // iOS Safari はネイティブ ruby の列幅を独自計算するため line-height:1 でも行間が広がる
-  // position:absolute の .rt で代替することで列幅への影響をゼロにする
-  html = html.replace(
-    /<ruby>((?:[^<]|<(?!\/?ruby\b)[^>]*>)*)<rt>([^<]*)<\/rt>\s*<\/ruby>/gi,
-    (_, base, reading) => `<span class="rw"><span class="rt">${reading}</span>${base}</span>`
-  );
-  // 変換されなかった ruby/rt タグを除去（念のため）
-  html = html.replace(/<\/?(ruby|rt)\b[^>]*>/gi, '');
   // 傍点(sesame系): 1文字ずつ <span class="sd"> に分割
   // → CSS position:absolute の ::after でナカグロを付与（line-height に影響しない）
   html = html.replace(
