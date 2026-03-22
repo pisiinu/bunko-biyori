@@ -60,14 +60,8 @@ export function processAozoraHtml(arrayBuffer) {
   html = html.replace(/<\/?rp[^>]*>/gi, '');
   // <rb> タグを除去（中身は保持）
   html = html.replace(/<\/?rb[^>]*>/gi, '');
-  // ruby を span ベース構造に変換
-  // .rw{transform:translate(0)} により CSS 仕様の「transform 非 none → 含有ブロック生成」を利用
-  // display:inline のまま position:absolute の .rt の含有ブロックにする
-  html = html.replace(
-    /<ruby>((?:[^<]|<(?!\/?ruby\b)[^>]*>)*)<rt>([^<]*)<\/rt>\s*<\/ruby>/gi,
-    (_, base, reading) => `<span class="rw"><span class="ra"><span class="rt">${reading}</span></span>${base}</span>`
-  );
-  html = html.replace(/<\/?(ruby|rt)\b[^>]*>/gi, '');
+  // <ruby>/<rt> はネイティブのまま残す（ブラウザ最適化 ruby レイアウトを使用）
+  // position:absolute による独自実装は iOS Safari の vertical-rl で極端に重くなるため廃止
   // 傍点(sesame系): 1文字ずつ <span class="sd"> に分割
   // → CSS position:absolute の ::after でナカグロを付与（line-height に影響しない）
   html = html.replace(

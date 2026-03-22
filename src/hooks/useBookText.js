@@ -13,7 +13,7 @@ import { fetchAozoraHtml } from '../utils/aozoraParser.js';
 
 // ─── IndexedDB キャッシュ ───
 const DB_NAME = 'bunko';
-const DB_VER  = 1;
+const DB_VER  = 2; // v2: native ruby (position:absolute カスタム実装を廃止)
 const STORE   = 'html';
 const MAX_CACHED_BOOKS = 30;
 
@@ -22,8 +22,9 @@ function openDb() {
     const req = indexedDB.open(DB_NAME, DB_VER);
     req.onupgradeneeded = e => {
       const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE))
-        db.createObjectStore(STORE, { keyPath: 'bookId' });
+      // バージョンアップ時は古いキャッシュを削除（HTML形式変更のため）
+      if (db.objectStoreNames.contains(STORE)) db.deleteObjectStore(STORE);
+      db.createObjectStore(STORE, { keyPath: 'bookId' });
     };
     req.onsuccess = e => resolve(e.target.result);
     req.onerror   = () => reject(req.error);

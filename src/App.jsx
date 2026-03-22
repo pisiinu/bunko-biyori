@@ -278,7 +278,7 @@ function saveBookProgress(bookId, data) {
 
 
 /* ─── HTML を <br> 区切りで分割（長編のレイジーレンダリング用） ─── */
-const CHUNK_SIZE  = 15000; // chars（長編でもiOS Safariが固まらない単位）
+const CHUNK_SIZE  = 20000; // chars
 const INIT_CHUNKS = 2;     // 初回描画チャンク数
 
 function splitChunks(html) {
@@ -508,8 +508,8 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
       <style>{`
         .bunko-scroll::-webkit-scrollbar{display:none}
         .bunko-scroll{-ms-overflow-style:none;scrollbar-width:none}
-        .ra{display:inline-block;position:relative;width:0;overflow:visible}
-        .rt{position:absolute;writing-mode:vertical-rl;right:-2.1em;top:0;font-size:0.75em;line-height:1;white-space:nowrap}
+        ruby{ruby-position:over}
+        rt{font-size:0.5em;line-height:1}
         .gaiji{font-family:'Noto Serif JP','HiraMinProN-W3','Hiragino Mincho ProN','Hiragino Mincho Pro',serif}
         .sd{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Ccircle cx='5' cy='5' r='4.5' fill='%23140800'/%3E%3C/svg%3E");background-size:0.3em 0.3em;background-repeat:no-repeat;background-position:right center}
         blockquote,pre{font-size:inherit;font-family:inherit}
