@@ -1,5 +1,11 @@
 import { GAIJI_TABLE } from '../data/gaiji-table.js';
 
+// 青空文庫の gaiji 画像のうち JIS X 0208 由来（alt に「第N水準」がないもの）の変換テーブル
+// キー形式: "面-区-点"（alt テキスト内の N-row-col 表記に合わせる）
+const GAIJI_JIS0208 = {
+  '1-2-22': '々', // 二の字点 U+3005
+};
+
 const GITHUB_BASE = 'https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/';
 const AOZORA_BASE = 'https://www.aozora.gr.jp/';
 
@@ -8,13 +14,16 @@ export function toRawUrl(url) {
 }
 
 function resolveGaiji(alt) {
+  // 第3・第4水準: "第3水準1-14-7" 形式
   const m = alt.match(/第([34])水準(\d+)-(\d+)-(\d+)/);
-  if (!m) return '※';
-  const level = m[1];
-  const row = parseInt(m[3]);
-  const col = parseInt(m[4]);
-  const key = `${level}-${(row + 0x20).toString(16).toUpperCase().padStart(2, '0')}${(col + 0x20).toString(16).toUpperCase().padStart(2, '0')}`;
-  return GAIJI_TABLE[key] ?? '※';
+  if (m) {
+    const key = `${m[1]}-${(parseInt(m[3]) + 0x20).toString(16).toUpperCase().padStart(2, '0')}${(parseInt(m[4]) + 0x20).toString(16).toUpperCase().padStart(2, '0')}`;
+    return GAIJI_TABLE[key] ?? '※';
+  }
+  // JIS X 0208: "1-2-22" 形式（第N水準プレフィックスなし）
+  const m2 = alt.match(/(\d+)-(\d+)-(\d+)/);
+  if (m2) return GAIJI_JIS0208[`${m2[1]}-${m2[2]}-${m2[3]}`] ?? '※';
+  return '※';
 }
 
 /**
@@ -51,6 +60,12 @@ export function processAozoraHtml(arrayBuffer) {
   html = html.replace(/<\/?rp[^>]*>/gi, '');
   // <rb> タグを除去（中身は保持）
   html = html.replace(/<\/?rb[^>]*>/gi, '');
+  // ruby ベーステキストを <span> で包む
+  // iOS Safari は base が element ノードのとき rt をより近く配置する（外字と同じ挙動にする）
+  html = html.replace(
+    /<ruby>((?:[^<]|<(?!\/?ruby\b)[^>]*>)*)<rt>/gi,
+    (_, base) => `<ruby><span>${base}</span><rt>`
+  );
   // 傍点(sesame系): 1文字ずつ <span class="sd"> に分割
   // → CSS position:absolute の ::after でナカグロを付与（line-height に影響しない）
   html = html.replace(
