@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react"; // useLayoutEffect: scroll restore
-import { useBookText, precacheBook } from "./hooks/useBookText.js";
+import { useBookText, precacheBook, deleteBookCache } from "./hooks/useBookText.js";
 import { useCatalog, searchCatalog } from "./hooks/useCatalog.js";
 
-const MAX_SHELF = 9;
-const MAX_BM    = 3;
+const MAX_BM = 3;
 // 茶系3色
 const BM_COLORS = ["#7a4a20","#a07040","#5a3818"];
 // PWA（ホーム画面から起動）かブラウザ内かを判定
@@ -887,12 +886,15 @@ export default function App() {
 
   function toggleWant(id){ setWantList(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]); }
   function save(book){
-    if(shelf.length>=MAX_SHELF||shelf.find(b=>b.id===book.id)) return;
+    if(shelf.find(b=>b.id===book.id)) return;
     setLoading(book.id);
     precacheBook(book.id, book.url); // バックグラウンドで本文をキャッシュ
     setTimeout(()=>{setShelf(p=>[...p,book]);setLoading(null);},650);
   }
-  function removeFromShelf(id){ setShelf(prev=>prev.filter(b=>b.id!==id)); }
+  function removeFromShelf(id){
+    setShelf(prev=>prev.filter(b=>b.id!==id));
+    deleteBookCache(id); // キャッシュも削除
+  }
   function doSearch(e){
     e.preventDefault();
     const q=query.trim();
@@ -913,15 +915,14 @@ export default function App() {
 
   function SaveBtn({ book }) {
     const saved=!!shelf.find(b=>b.id===book.id);
-    const full=shelf.length>=MAX_SHELF;
     const isL=loading===book.id;
     return (
-      <button onClick={()=>!saved&&!full&&save(book)} disabled={saved||full||isL}
+      <button onClick={()=>!saved&&save(book)} disabled={saved||isL}
         style={{background:saved?"transparent":"#2a1800",color:saved?"#9a8060":"#f7f2e8",
           border:"1px solid #c0a880",padding:"5px 12px",fontSize:12,
-          cursor:saved||full?"default":"pointer",letterSpacing:"0.08em",
+          cursor:saved?"default":"pointer",letterSpacing:"0.08em",
           whiteSpace:"nowrap",opacity:isL?0.5:1}}>
-        {isL?"…":saved?"保存済":full?`上限${MAX_SHELF}冊`:"書庫へ"}
+        {isL?"…":saved?"保存済":"書庫へ"}
       </button>
     );
   }
@@ -944,7 +945,7 @@ export default function App() {
                 border:"1px solid #c0a880",marginLeft:-1,padding:"6px 11px",cursor:"pointer",
                 fontSize:13,letterSpacing:"0.1em",transition:"all 0.15s"}}>
               {label}
-              {s==="shelf"&&<span style={{fontSize:10,marginLeft:3,opacity:0.5}}>{shelf.length}/{MAX_SHELF}</span>}
+              {s==="shelf"&&shelf.length>0&&<span style={{fontSize:10,marginLeft:3,opacity:0.5}}>{shelf.length}</span>}
               {s==="wantlist"&&wantList.length>0&&<span style={{fontSize:10,marginLeft:3,opacity:0.5}}>{wantList.length}</span>}
             </button>
           ))}
@@ -968,8 +969,9 @@ export default function App() {
 
           {/* ════ 書庫パネル ════ */}
           <div style={{minWidth:"100%",boxSizing:"border-box",padding:"18px 20px 56px"}}>
-            <div style={{fontSize:13,letterSpacing:"0.2em",color:"#9a8060",borderBottom:"1px solid #d0b898",paddingBottom:7,marginBottom:18}}>
-              書庫　{shelf.length} 冊 ／ 最大 {MAX_SHELF} 冊
+            <div style={{borderBottom:"1px solid #d0b898",paddingBottom:7,marginBottom:18}}>
+              <span style={{fontSize:13,letterSpacing:"0.2em",color:"#9a8060"}}>書庫　{shelf.length} 冊</span>
+              <div style={{fontSize:9,color:"#b09878",letterSpacing:"0.06em",marginTop:4,opacity:0.8}}>※ 大長編小説には対応していません</div>
             </div>
             {shelf.length===0?(
               <div style={{color:"#9a8060",marginTop:36,padding:"0 4px"}}>
@@ -978,7 +980,7 @@ export default function App() {
                   <div>右へスワイプするとランキングと</div>
                   <div>検索があります</div>
                   <div style={{marginTop:6}}>気に入った本の「書庫へ」を押すと</div>
-                  <div>最大 {MAX_SHELF} 冊まで保存できます</div>
+                  <div>端末に保存して読めます</div>
                   <div style={{marginTop:6,opacity:0.65,fontSize:11}}>保存と同時に本文もダウンロードされ</div>
                   <div style={{opacity:0.65,fontSize:11}}>オフラインでも読めます</div>
                 </div>
@@ -1007,9 +1009,6 @@ export default function App() {
                         </div>
                       </div>
                     ))}
-                    {Array.from({length:Math.max(0,Math.min(3,MAX_SHELF-shelf.length))}).map((_,i)=>(
-                      <div key={`e${i}`} style={{width:94,height:143,border:"1px dashed rgba(140,110,70,0.25)",opacity:0.4}}/>
-                    ))}
                   </div>
                   <div style={{height:5,marginTop:10,background:"linear-gradient(180deg,#b09060 0%,#9a7848 100%)",borderRadius:2,boxShadow:"0 2px 4px rgba(0,0,0,0.16)"}}/>
                 </div>
@@ -1036,7 +1035,6 @@ export default function App() {
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                   {rankingBooks.map((book,i)=>{
                     const saved=!!shelf.find(b=>b.id===book.id);
-                    const full=shelf.length>=MAX_SHELF;
                     const isL=loading===book.id;
                     return (
                       <div key={book.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
@@ -1049,11 +1047,11 @@ export default function App() {
                         </div>
                         <div style={{display:"flex",alignItems:"center",gap:3}}>
                           <WantBtn id={book.id} wantList={wantList} toggle={toggleWant}/>
-                          <button onClick={()=>!saved&&!full&&save(book)}
+                          <button onClick={()=>!saved&&save(book)}
                             style={{background:"none",border:"1px solid #c0a880",
                               color:saved?"#9a8060":"#5a4030",padding:"3px 9px",
-                              cursor:saved||full?"default":"pointer",fontSize:12,letterSpacing:"0.05em"}}>
-                            {isL?"…":saved?"保存済":full?"満杯":"書庫へ"}
+                              cursor:saved?"default":"pointer",fontSize:12,letterSpacing:"0.05em"}}>
+                            {isL?"…":saved?"保存済":"書庫へ"}
                           </button>
                         </div>
                       </div>

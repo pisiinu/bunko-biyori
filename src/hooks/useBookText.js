@@ -67,6 +67,18 @@ async function writeCache(bookId, html) {
   } catch {}
 }
 
+/** 書庫から本を返すときにキャッシュも削除 */
+export async function deleteBookCache(bookId) {
+  try {
+    const db = await openDb();
+    await new Promise(resolve => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(bookId);
+      tx.oncomplete = resolve;
+    });
+  } catch {}
+}
+
 /**
  * 書庫保存時に本文をバックグラウンドでキャッシュする
  * 既にキャッシュ済みの場合は何もしない
