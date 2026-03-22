@@ -352,13 +352,18 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
     if(!html || !containerRef.current) return;
     const anchor = fontAnchorRef.current;
     const raf = requestAnimationFrame(()=>{
+      const el = containerRef.current;
+      if(!el) return;
+      const max = el.scrollWidth - el.clientWidth;
       if(anchor !== null){
         fontAnchorRef.current = null;
-        scrollToCharOffset(anchor, 'instant');
+        // newScrollLeft = oldScrollLeft × (newScrollWidth / oldScrollWidth)
+        // コンテンツ幅の比率でスケール（ratio×maxより正確）
+        const newScrollLeft = anchor.scrollWidth > 0
+          ? anchor.scrollLeft * (el.scrollWidth / anchor.scrollWidth)
+          : -(scrollRatioRef.current * max);
+        el.scrollLeft = Math.max(-max, Math.min(0, newScrollLeft));
       } else {
-        const el = containerRef.current;
-        if(!el) return;
-        const max = el.scrollWidth - el.clientWidth;
         el.scrollLeft = -(scrollRatioRef.current * max);
       }
     });
@@ -539,7 +544,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
               <span style={{fontSize:10,color:"#9a8060",letterSpacing:"0.1em",minWidth:58}}>文字サイズ</span>
               <div style={{display:"flex",gap:4}}>
                 {FS.map(s=>(
-                  <button key={s} onClick={()=>{ fontAnchorRef.current=captureTextAnchor(); setFontSize(s); }}
+                  <button key={s} onClick={()=>{ const el=containerRef.current; fontAnchorRef.current=el?{scrollLeft:el.scrollLeft,scrollWidth:el.scrollWidth}:null; setFontSize(s); }}
                     style={{width:38,height:34,background:fontSize===s?"#2a1800":"transparent",
                       color:fontSize===s?"#f7f2e8":"#5a4030",border:`1px solid #c0a880`,cursor:"pointer",
                       fontSize:s*0.68,fontFamily:"'Noto Serif JP','Yu Mincho',serif",transition:"all 0.12s"}}>あ</button>
