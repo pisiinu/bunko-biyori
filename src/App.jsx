@@ -278,8 +278,9 @@ function saveBookProgress(bookId, data) {
 
 
 /* ─── HTML を <br> 区切りで分割（長編のレイジーレンダリング用） ─── */
-const CHUNK_SIZE  = 20000; // chars
-const INIT_CHUNKS = 2;     // 初回描画チャンク数
+const CHUNK_SIZE     = 20000; // chars
+const INIT_CHUNKS    = 2;     // 初回描画チャンク数
+const TOO_LARGE_HTML = 400000; // この文字数を超えたら「大きすぎる」とみなす
 
 function splitChunks(html) {
   const chunks = [];
@@ -372,7 +373,7 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
 
   // html 読み込み後：チャンク分割 → 初回描画 → スクロール位置復元
   useEffect(()=>{
-    if(!html || !contentRef.current) return;
+    if(!html || !contentRef.current || html.length > TOO_LARGE_HTML) return;
     const chunks = splitChunks(html);
     chunksRef.current = chunks;
     renderedCountRef.current = Math.min(INIT_CHUNKS, chunks.length);
@@ -419,6 +420,46 @@ function PageReader({ book, onClose, fontSize, setFontSize }) {
       <style>{"@keyframes spin{to{transform:rotate(360deg)}}"}</style>
     </div>
   );
+
+  if(html && html.length > TOO_LARGE_HTML) {
+    const aozoraUrl = book.url.replace(
+      'https://raw.githubusercontent.com/aozorabunko/aozorabunko/master/',
+      'https://www.aozora.gr.jp/'
+    );
+    const amazonUrl = `https://www.amazon.co.jp/s?k=${encodeURIComponent(book.author+' '+book.title)}&tag=hana0f-22`;
+    return (
+      <div style={{position:"fixed",inset:0,background:"linear-gradient(150deg,#f7f2e8 0%,#ece6d4 100%)",
+        display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+        fontFamily:"'Noto Serif JP','Yu Mincho',serif",gap:0,padding:32,textAlign:"center"}}>
+        <div style={{fontSize:13,color:"#5a3a18",letterSpacing:"0.15em",marginBottom:6}}>{book.title}</div>
+        <div style={{fontSize:10,color:"#9a7050",letterSpacing:"0.08em",marginBottom:28}}>{book.author}</div>
+        <div style={{fontSize:12,color:"#7a5a30",letterSpacing:"0.08em",lineHeight:2,marginBottom:24}}>
+          申し訳ありません。<br/>
+          この作品はアプリで表示できる<br/>
+          サイズの限界を超えています。
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%",maxWidth:240}}>
+          <a href={aozoraUrl} target="_blank" rel="noopener noreferrer"
+            style={{display:"block",background:"none",border:"1.5px solid #a08050",
+              color:"#3a2010",padding:"10px 0",fontSize:12,letterSpacing:"0.08em",
+              textDecoration:"none",fontWeight:600}}>
+            青空文庫で読む（横書き）
+          </a>
+          <a href={amazonUrl} target="_blank" rel="noopener noreferrer"
+            style={{display:"block",background:"none",border:"1px solid #c0a880",
+              color:"#7a5a30",padding:"10px 0",fontSize:12,letterSpacing:"0.08em",
+              textDecoration:"none"}}>
+            紙の本を探す
+          </a>
+        </div>
+        <button onClick={onClose}
+          style={{marginTop:28,background:"none",border:"none",color:"#9a8060",
+            fontSize:11,letterSpacing:"0.1em",cursor:"pointer",textDecoration:"underline"}}>
+          戻る
+        </button>
+      </div>
+    );
+  }
 
   if(textError) return (
     <div style={{position:"fixed",inset:0,background:"linear-gradient(150deg,#f7f2e8 0%,#ece6d4 100%)",
