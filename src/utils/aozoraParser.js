@@ -51,6 +51,13 @@ export function processAozoraHtml(arrayBuffer) {
   html = html.replace(/<\/?rp[^>]*>/gi, '');
   // <rb> タグを除去（中身は保持）
   html = html.replace(/<\/?rb[^>]*>/gi, '');
+  // ruby ベーステキストを <span> で包む
+  // iOS Safari は base が element ノード（<span>）のとき rt をより近く配置する
+  // gaiji は既に <span class="gaiji"> で包まれているため構造を統一する
+  html = html.replace(
+    /<ruby>((?:[^<]|<(?!\/?ruby\b)[^>]*>)*)<rt>/gi,
+    (_, base) => `<ruby><span>${base}</span><rt>`
+  );
   // 傍点(sesame系): 1文字ずつ <span class="sd"> に分割
   // → CSS position:absolute の ::after でナカグロを付与（line-height に影響しない）
   html = html.replace(
